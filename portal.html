@@ -1,0 +1,262 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portal de Download — Plantio</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:      #101810;
+    --surface: #141F14;
+    --surface2:#1A281A;
+    --border:  #2F422F;
+    --accent:  #4CAF50;
+    --green:   #4CAF72;
+    --blue:    #5A9FD4;
+    --red:     #D95C5C;
+    --text:    #EAE5E0;
+    --muted:   #6A8070;
+    --shadow:  0 2px 8px rgba(0,0,0,.35);
+    --radius:  8px;
+  }
+  [data-theme="light"] {
+    --bg:      #EBF2EB;
+    --surface: #FFFFFF;
+    --surface2:#DFF0DF;
+    --border:  #B8D0B8;
+    --accent:  #2E7D32;
+    --text:    #1C1A18;
+    --muted:   #6B5B50;
+    --shadow:  0 2px 8px rgba(0,0,0,.10);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter','Segoe UI',sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 0 28px; height: 60px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100; box-shadow: var(--shadow);
+  }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-mark {
+    width: 36px; height: 36px; background: var(--accent); border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 14px; color: #fff;
+  }
+  .logo-text { font-size: 14px; font-weight: 700; }
+  .logo-sub  { font-size: 11px; color: var(--muted); font-family: monospace; }
+  .header-right { display: flex; gap: 10px; align-items: center; }
+  .btn-header {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+    padding: 7px 14px; font-size: 12px; font-weight: 600; color: var(--text);
+    cursor: pointer; text-decoration: none; transition: border-color .2s;
+    font-family: inherit;
+  }
+  .btn-header:hover { border-color: var(--accent); color: var(--accent); }
+  .theme-toggle {
+    width: 34px; height: 34px; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 15px; transition: border-color .2s;
+  }
+  .theme-toggle:hover { border-color: var(--accent); }
+
+  .main { max-width: 1000px; margin: 0 auto; padding: 28px 24px; }
+
+  .toolbar {
+    display: flex; gap: 12px; align-items: center; margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+  .search-wrap { position: relative; flex: 1; min-width: 200px; }
+  .search-wrap input {
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 9px 12px 9px 36px;
+    color: var(--text); font-family: inherit; font-size: 13px; outline: none;
+    transition: border-color .2s;
+  }
+  .search-wrap input:focus { border-color: var(--accent); }
+  .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 14px; pointer-events: none; }
+  .counter { font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+  .releases-grid { display: flex; flex-direction: column; gap: 14px; }
+
+  .release-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden; box-shadow: var(--shadow);
+    transition: border-color .2s;
+  }
+  .release-card:hover { border-color: var(--accent); }
+  .release-header {
+    padding: 14px 18px; background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    cursor: pointer; user-select: none;
+  }
+  .release-title { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+  .release-cod {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+    padding: 2px 8px; font-size: 11px; font-family: monospace; color: var(--muted); font-weight: 400;
+  }
+  .release-date { font-size: 11px; color: var(--muted); }
+  .release-chevron { color: var(--muted); font-size: 12px; transition: transform .2s; }
+  .release-card.open .release-chevron { transform: rotate(180deg); }
+
+  .release-assets { padding: 14px 18px; display: none; flex-direction: column; gap: 8px; }
+  .release-card.open .release-assets { display: flex; }
+
+  .asset-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 9px 12px; background: var(--bg); border: 1px solid var(--border);
+    border-radius: var(--radius); transition: border-color .15s;
+  }
+  .asset-row:hover { border-color: var(--accent); }
+  .asset-left  { display: flex; align-items: center; gap: 10px; }
+  .asset-icon  { font-size: 18px; width: 24px; text-align: center; }
+  .asset-name  { font-size: 13px; font-weight: 500; font-family: monospace; }
+  .asset-size  { font-size: 11px; color: var(--muted); }
+  .btn-download {
+    background: var(--accent); color: #fff; border: none; border-radius: 6px;
+    padding: 6px 14px; font-size: 12px; font-weight: 700; cursor: pointer;
+    text-decoration: none; transition: opacity .15s; font-family: inherit;
+  }
+  .btn-download:hover { opacity: .85; }
+
+  .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .empty-icon { font-size: 48px; margin-bottom: 12px; opacity: .3; }
+  .empty-text { font-size: 14px; }
+
+  .loading { text-align: center; padding: 60px; color: var(--muted); font-size: 14px; }
+  .error-msg { background: rgba(217,92,92,.1); border: 1px solid var(--red); border-radius: 8px; padding: 14px 18px; color: var(--red); font-size: 13px; margin-bottom: 20px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <div class="logo-mark">PLT</div>
+    <div>
+      <div class="logo-text">PROGRAMAÇÃO PLANTIO</div>
+      <div class="logo-sub">portal de download</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <a href="sistema_preenchimento/formulario.html" class="btn-header">↗ Preenchimento</a>
+    <button class="theme-toggle" onclick="toggleTheme()" title="Alternar tema">☀</button>
+  </div>
+</header>
+
+<div class="main">
+  <div class="toolbar">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="searchInput" placeholder="Buscar fazenda..." oninput="filtrar()">
+    </div>
+    <span class="counter" id="counter">carregando...</span>
+  </div>
+  <div id="content"><div class="loading">Carregando releases...</div></div>
+</div>
+
+<script>
+const GH_OWNER = 'lmalerbo';
+const GH_REPO  = 'project-plantio';
+const API_URL  = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/releases?per_page=100`;
+
+let allReleases = [];
+
+function fileIcon(name) {
+  const ext = name.split('.').pop().toLowerCase();
+  return ext === 'dwg' ? '📐' : ext === 'pdf' ? '📄' : ext === 'zip' ? '📦' : '📎';
+}
+
+function fileLabel(name) {
+  const ext = name.split('.').pop().toLowerCase();
+  if (ext === 'dwg')  return 'Projeto';
+  if (ext === 'zip')  return 'Exportação';
+  if (ext === 'pdf')  return 'Mapa';
+  return ext.toUpperCase();
+}
+
+function fmtBytes(b) {
+  if (b < 1024) return `${b} B`;
+  if (b < 1024*1024) return `${(b/1024).toFixed(0)} KB`;
+  return `${(b/1024/1024).toFixed(1)} MB`;
+}
+
+function fmtDate(iso) {
+  return new Date(iso).toLocaleDateString('pt-BR', { day:'2-digit', month:'short', year:'numeric' });
+}
+
+function renderReleases(releases) {
+  const content = document.getElementById('content');
+  if (!releases.length) {
+    content.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">Nenhuma fazenda encontrada.</div></div>`;
+    return;
+  }
+
+  content.innerHTML = `<div class="releases-grid">${releases.map(rel => {
+    const assets = (rel.assets || []);
+    const assetsHtml = assets.length ? assets.map(a => `
+      <div class="asset-row">
+        <div class="asset-left">
+          <span class="asset-icon">${fileIcon(a.name)}</span>
+          <div>
+            <div class="asset-name">${a.name}</div>
+            <div class="asset-size">${fileLabel(a.name)} · ${fmtBytes(a.size)}</div>
+          </div>
+        </div>
+        <a class="btn-download" href="${a.browser_download_url}" download>Baixar</a>
+      </div>`).join('') : `<div style="color:var(--muted);font-size:13px">Nenhum arquivo nesta fazenda.</div>`;
+
+    return `
+    <div class="release-card open" data-name="${rel.name || rel.tag_name}">
+      <div class="release-header" onclick="toggleCard(this.parentElement)">
+        <div class="release-title">
+          ${rel.name || rel.tag_name}
+          <span class="release-cod">${rel.tag_name}</span>
+        </div>
+        <div style="display:flex;gap:14px;align-items:center">
+          <span class="release-date">${fmtDate(rel.published_at || rel.created_at)}</span>
+          <span class="release-chevron">▲</span>
+        </div>
+      </div>
+      <div class="release-assets">${assetsHtml}</div>
+    </div>`;
+  }).join('')}</div>`;
+
+  document.getElementById('counter').textContent = `${releases.length} fazenda(s)`;
+}
+
+function toggleCard(card) {
+  card.classList.toggle('open');
+}
+
+function filtrar() {
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  const filtered = q ? allReleases.filter(r => (r.name || r.tag_name).toLowerCase().includes(q)) : allReleases;
+  renderReleases(filtered);
+}
+
+async function load() {
+  try {
+    const res = await fetch(API_URL);
+    if (!res.ok) throw new Error(`GitHub API: ${res.status} ${res.statusText}`);
+    allReleases = await res.json();
+    // Sort by name (fazenda name)
+    allReleases.sort((a, b) => (a.name || a.tag_name).localeCompare(b.name || b.tag_name, 'pt-BR'));
+    renderReleases(allReleases);
+  } catch (e) {
+    document.getElementById('content').innerHTML =
+      `<div class="error-msg">Erro ao carregar releases: ${e.message}</div>`;
+    document.getElementById('counter').textContent = 'erro';
+  }
+}
+
+function toggleTheme() {
+  const h = document.documentElement;
+  h.setAttribute('data-theme', h.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+}
+
+load();
+</script>
+</body>
+</html>

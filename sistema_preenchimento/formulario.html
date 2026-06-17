@@ -1,0 +1,3438 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Programação Plantio — Preenchimento</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<style>
+  /* ── Tema Escuro (padrão) ── */
+  :root {
+    --bg:       #101810;
+    --surface:  #141F14;
+    --surface2: #1A281A;
+    --border:   #2F422F;
+    --accent:   #4CAF50;
+    --accent2:  #388E3C;
+    --green:    #4CAF72;
+    --red:      #D95C5C;
+    --blue:     #5A9FD4;
+    --text:     #E5EAE0;
+    --muted:    #7A8875;
+    --shadow:   0 2px 8px rgba(0,0,0,.35);
+    --radius:   8px;
+  }
+
+  /* ── Tema Claro ── */
+  [data-theme="light"] {
+    --bg:       #EBF2EB;
+    --surface:  #FFFFFF;
+    --surface2: #DFF0DF;
+    --border:   #B8D0B8;
+    --accent:   #2E7D32;
+    --accent2:  #1B5E20;
+    --green:    #2D7A4A;
+    --red:      #C0392B;
+    --blue:     #2A6FA8;
+    --text:     #1C1F1A;
+    --muted:    #6B6B5F;
+    --shadow:   0 2px 8px rgba(0,0,0,.10);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    transition: background .25s, color .25s;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: var(--shadow);
+  }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-mark {
+    width: 36px; height: 36px;
+    background: var(--accent);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 14px; color: #fff;
+    letter-spacing: 0.5px;
+  }
+  .logo-text { font-size: 14px; font-weight: 700; letter-spacing: 0.3px; }
+  .logo-sub  { font-size: 11px; color: var(--muted); font-family: monospace; }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+
+  .theme-toggle {
+    width: 34px; height: 34px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 15px;
+    transition: border-color .2s;
+    flex-shrink: 0;
+  }
+  .theme-toggle:hover { border-color: var(--accent); }
+
+  .user-badge {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-family: monospace;
+    color: var(--accent);
+    cursor: pointer;
+    font-weight: 600;
+    transition: border-color .2s;
+  }
+  .user-badge:hover { border-color: var(--accent); }
+
+  /* ── Layout ── */
+  .app { display: flex; flex: 1; overflow: hidden; }
+
+  /* ── Main ── */
+  .main {
+    flex: 1; overflow-y: auto;
+    padding: 24px 28px;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+
+  /* ── Farm Selector Dropdown ── */
+  .faz-selector {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    box-shadow: var(--shadow);
+    position: relative; z-index: 10;
+  }
+  .faz-selector-row { display: flex; align-items: center; gap: 14px; }
+  .faz-selector-label {
+    font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--muted); white-space: nowrap;
+  }
+  .faz-search-wrap { flex: 1; position: relative; }
+  .faz-search-wrap input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 9px 12px;
+    color: var(--text);
+    font-family: inherit; font-size: 13px;
+    outline: none; transition: border-color .2s;
+  }
+  .faz-search-wrap input:focus { border-color: var(--accent); }
+  .faz-dropdown {
+    position: absolute;
+    top: calc(100% + 4px); left: 0; right: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    max-height: 300px; overflow-y: auto;
+    z-index: 50;
+    box-shadow: 0 8px 24px rgba(0,0,0,.3);
+    display: none;
+  }
+  .faz-dropdown.open { display: block; }
+  .faz-dropdown::-webkit-scrollbar { width: 4px; }
+  .faz-dropdown::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .faz-selected-badge {
+    background: var(--surface2);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 12px; font-weight: 600;
+    color: var(--accent); white-space: nowrap; flex-shrink: 0;
+  }
+  .fazenda-item {
+    padding: 9px 14px;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: all .12s;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .fazenda-item:hover   { background: var(--surface2); border-left-color: var(--border); }
+  .fazenda-item.active  { background: var(--surface2); border-left-color: var(--accent); }
+  .fazenda-item.registered { border-left-color: var(--green); }
+  .fazenda-item.registered.active { border-left-color: var(--accent); }
+  .fazenda-name { font-size: 13px; font-weight: 600; }
+  .fazenda-meta { font-size: 11px; color: var(--muted); font-family: monospace; margin-top: 2px; }
+  .reg-dot { color: var(--green); font-size: 11px; margin-left: 4px; }
+  .fazenda-count {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1px 7px;
+    font-size: 10px; font-family: monospace;
+    color: var(--muted); white-space: nowrap; flex-shrink: 0;
+  }
+  .fazenda-item.active .fazenda-count     { border-color: var(--accent); color: var(--accent); }
+  .fazenda-item.registered .fazenda-count { border-color: var(--green);  color: var(--green); }
+
+  /* ── User chips ── */
+  .user-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; min-height: 36px; }
+  .user-chip {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 10px;
+    font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s;
+  }
+  .user-chip:hover { border-color: var(--accent); }
+  .user-chip.active { border-color: var(--accent); color: var(--accent); background: rgba(200,150,12,.1); }
+  .user-chip-del {
+    background: none; border: none; cursor: pointer;
+    color: var(--muted); font-size: 15px; line-height: 1;
+    padding: 0 2px; border-radius: 2px; transition: color .12s;
+  }
+  .user-chip-del:hover { color: var(--red); }
+
+  .placeholder {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 10px;
+    color: var(--muted);
+  }
+  .placeholder-icon { font-size: 40px; opacity: .25; }
+  .placeholder-text { font-size: 13px; font-weight: 500; }
+
+  /* ── Form Card ── */
+  .form-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .form-card-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--surface2);
+  }
+  .form-card-title {
+    font-size: 15px; font-weight: 700;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .frente-tag {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-family: monospace;
+    color: var(--muted);
+    font-weight: 400;
+  }
+  .form-card-body { padding: 18px; }
+
+  /* ── Cobertura toggle ── */
+  .cob-toggle { display: flex; gap: 8px; margin-bottom: 18px; }
+  .cob-btn {
+    flex: 1; padding: 9px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: all .18s;
+    text-align: center;
+  }
+  .cob-btn.active {
+    background: var(--surface2);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* ── Talhões ── */
+  .talhoes-section { margin-bottom: 18px; }
+  .talhoes-label {
+    font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px;
+    color: var(--muted); margin-bottom: 8px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .talhoes-actions { display: flex; gap: 8px; }
+  .link-btn {
+    font-size: 11px; color: var(--accent);
+    cursor: pointer; font-family: monospace;
+    background: none; border: none; padding: 0; font-weight: 600;
+  }
+  .link-btn:hover { text-decoration: underline; }
+  .talhoes-grid { display: flex; flex-wrap: wrap; gap: 5px; }
+  .tal-chip {
+    padding: 4px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: monospace;
+    cursor: pointer;
+    transition: all .12s;
+    user-select: none;
+  }
+  .tal-chip:hover { border-color: var(--accent); color: var(--accent); }
+  .tal-chip.selected {
+    background: rgba(200,150,12,.12);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .tal-chip.disabled { opacity: .25; cursor: default; pointer-events: none; }
+  .tal-chip.mes-atual {
+    border-color: var(--green);
+    color: var(--text);
+    background: transparent;
+  }
+  .tal-chip.mes-atual:hover { background: rgba(76,175,114,.12); }
+  .tal-chip.mes-atual.selected {
+    border-color: var(--green);
+    background: rgba(76,175,114,.38);
+    color: #fff;
+    font-weight: 700;
+  }
+  .tal-chip-18m {
+    display: inline-block; padding: 0 4px; border-radius: 2px;
+    font-size: 8px; font-weight: 800; font-family: monospace;
+    background: rgba(217,92,92,.18); color: var(--red);
+    margin-left: 3px; vertical-align: middle; line-height: 14px;
+  }
+
+  /* ── Filtros de fazenda ── */
+  .faz-filter-row {
+    display: flex; align-items: center; gap: 6px;
+    margin-top: 8px; flex-wrap: wrap;
+  }
+  .faz-filter-label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--muted); white-space: nowrap;
+  }
+  .faz-filter-btn {
+    background: none; border: 1px solid var(--border);
+    border-radius: 4px; padding: 3px 10px;
+    font-size: 11px; font-weight: 700; font-family: monospace;
+    color: var(--muted); cursor: pointer; transition: all .15s;
+  }
+  .faz-filter-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .faz-filter-btn.active-blue   { border-color: var(--blue);   color: var(--blue);   background: rgba(90,159,212,.10); }
+  .faz-filter-btn.active-accent { border-color: var(--accent); color: var(--accent); background: rgba(200,150,12,.10); }
+  .faz-filter-btn.active-green  { border-color: var(--green);  color: var(--green);  background: rgba(76,175,114,.10); }
+  .faz-filter-btn.active-red    { border-color: var(--red);    color: var(--red);    background: rgba(217,92,92,.10); }
+  .fazenda-item.has-mes-atual .fazenda-count { border-color: var(--green); color: var(--green); }
+  /* ── Tela Consulta ── */
+  .consulta-filters { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+  .consulta-filters select { background:var(--surface2); color:var(--text); border:1px solid var(--border);
+    border-radius:5px; padding:5px 10px; font-size:12px; cursor:pointer; }
+  .consulta-filters select:focus { outline:none; border-color:var(--accent); }
+  .consulta-filter-count { font-size:11px; color:var(--muted); margin-left:auto; white-space:nowrap; }
+  .btn-limpar-filtros { background:none; border:1px solid var(--border); color:var(--muted);
+    border-radius:5px; padding:5px 10px; font-size:11px; cursor:pointer; }
+  .btn-limpar-filtros:hover { border-color:var(--accent); color:var(--accent); }
+  .consulta-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .consulta-table th { background:var(--surface2); font-size:11px; font-weight:700;
+    text-transform:uppercase; letter-spacing:.5px; padding:8px 12px;
+    text-align:left; color:var(--muted); border-bottom:1px solid var(--border); }
+  .consulta-table td { padding:9px 12px; border-bottom:1px solid var(--border); vertical-align:middle; }
+  .consulta-faz-row { cursor:pointer; transition:background .1s; }
+  .consulta-faz-row:hover td { background:var(--surface2); }
+  .consulta-faz-row.expanded td { background:var(--surface2); font-weight:600; }
+  .consulta-faz-row.selected td { background: rgba(200,150,12,.10); }
+  .consulta-faz-row.selected:hover td { background: rgba(200,150,12,.16); }
+  .consulta-cb { width:36px; padding:0 8px !important; text-align:center; }
+  .consulta-cb input[type=checkbox] { cursor:pointer; accent-color:var(--accent); width:14px; height:14px; vertical-align:middle; }
+  .consulta-sel-bar {
+    display:none; align-items:center; justify-content:space-between;
+    background:var(--accent); color:#fff;
+    padding:9px 14px; border-radius:var(--radius);
+    margin-bottom:8px; font-size:13px; font-weight:600;
+  }
+  .consulta-sel-bar.open { display:flex; }
+  .btn-sel-add {
+    background:rgba(255,255,255,.2); border:1px solid rgba(255,255,255,.4);
+    color:#fff; border-radius:6px; padding:6px 14px;
+    font-size:12px; font-weight:700; cursor:pointer;
+    transition:background .15s; font-family:inherit;
+  }
+  .btn-sel-add:hover { background:rgba(255,255,255,.3); }
+  .btn-sel-clear {
+    background:none; border:none; color:rgba(255,255,255,.75);
+    font-size:20px; line-height:1; cursor:pointer; padding:0 2px;
+  }
+  .btn-sel-clear:hover { color:#fff; }
+  .consulta-detail-row td { padding:0; }
+  .consulta-detail-inner { padding:0 12px 12px 32px; }
+  .consulta-detail-table { width:100%; border-collapse:collapse; font-size:12px; margin-top:6px; }
+  .consulta-detail-table th { color:var(--muted); font-size:10px; font-weight:700;
+    text-transform:uppercase; padding:5px 8px; border-bottom:1px solid var(--border); }
+  .consulta-detail-table td { padding:6px 8px; border-bottom:1px solid var(--border); }
+  .consulta-expand-icon { font-size:10px; color:var(--muted); margin-right:6px; display:inline-block; width:10px; }
+  .perfil-badge {
+    display: inline-block; font-size: 10px; font-weight: 700; font-family: monospace;
+    padding: 1px 6px; border-radius: 3px; border: 1px solid; margin-left: 4px;
+  }
+  .perfil-badge.p { border-color: var(--blue);  color: var(--blue); }
+  .perfil-badge.d { border-color: var(--green); color: var(--green); }
+  .admin-user-row {
+    display: flex; align-items: center; gap: 6px; padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .admin-user-row:last-child { border-bottom: none; }
+  .admin-user-name { flex: 1; font-size: 13px; font-weight: 600; }
+  .admin-perfil-check { display: flex; align-items: center; gap: 3px; font-size: 11px; color: var(--muted); cursor: pointer; }
+  .admin-perfil-check input { cursor: pointer; accent-color: var(--accent); }
+  .admin-section { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .admin-note { font-size: 10px; color: var(--muted); margin-top: 10px; line-height: 1.4; }
+  .mes-filter-select {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 4px;
+    color: var(--muted); font-size: 11px; font-family: monospace; font-weight: 700;
+    padding: 2px 4px; cursor: pointer; transition: all .15s; outline: none;
+  }
+  .mes-filter-select:hover { border-color: var(--accent); color: var(--accent); }
+  .mes-filter-select.active { border-color: var(--green); color: var(--green); background: rgba(76,175,114,.10); }
+
+  /* ── Fields ── */
+  .fields-row {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px; margin-bottom: 18px;
+  }
+  .field-group label {
+    display: block;
+    font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px;
+    color: var(--muted); margin-bottom: 5px;
+  }
+  .field-group select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 28px 8px 10px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color .2s;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%237A8875' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 9px center;
+  }
+  .field-group select:focus { border-color: var(--accent); }
+  .field-group select:disabled { opacity: .45; cursor: default; }
+  .field-group select option { background: var(--surface2); }
+
+  /* ── Submit ── */
+  .submit-row { display: flex; align-items: center; justify-content: space-between; }
+  .submit-info { font-size: 12px; color: var(--muted); font-family: monospace; }
+  .btn-submit {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    padding: 10px 26px;
+    font-family: inherit;
+    font-size: 13px; font-weight: 700;
+    cursor: pointer;
+    transition: all .18s;
+    letter-spacing: 0.3px;
+  }
+  .btn-submit:hover { background: var(--accent2); transform: translateY(-1px); box-shadow: 0 3px 8px rgba(0,0,0,.2); }
+  .btn-submit:disabled { opacity: .35; cursor: default; transform: none; box-shadow: none; }
+
+  /* ── Log ── */
+  .log-section { display: none; }
+  .log-section.visible { display: block; }
+  .section-title {
+    font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--muted); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .log-table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    background: var(--surface2);
+    padding: 9px 12px;
+    font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px;
+    color: var(--muted);
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 9px 12px;
+    font-size: 12px;
+    font-family: monospace;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+  .status-pill {
+    display: inline-block;
+    padding: 2px 8px; border-radius: 4px;
+    font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .status-CONCLUIDO   { background: rgba(76,175,114,.15); color: var(--green); }
+  .status-A\ FAZER    { background: rgba(200,150,12,.15); color: var(--accent); }
+  .status-SEM\ LINHAS { background: rgba(122,136,117,.15); color: var(--muted); }
+
+  .btn-edit, .btn-del {
+    background: none; border: none;
+    color: var(--muted); cursor: pointer;
+    padding: 2px 5px; border-radius: 4px;
+    font-size: 13px; transition: color .12s;
+  }
+  .btn-edit:hover { color: var(--accent); }
+  .btn-del:hover  { color: var(--red); }
+
+  /* ── Export bar ── */
+  .export-bar {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 10px 28px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; bottom: 0;
+    box-shadow: 0 -2px 8px rgba(0,0,0,.12);
+  }
+  .export-info { font-size: 12px; color: var(--muted); font-family: monospace; }
+  .btn-export {
+    background: var(--green);
+    color: #fff;
+    border: none; border-radius: var(--radius);
+    padding: 9px 22px;
+    font-family: inherit;
+    font-size: 13px; font-weight: 700;
+    cursor: pointer; transition: all .18s;
+    letter-spacing: 0.3px;
+  }
+  .btn-export:hover { opacity: .85; transform: translateY(-1px); }
+  .btn-export:disabled { opacity: .3; cursor: default; transform: none; }
+  /* ── Stats cards ── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    box-shadow: var(--shadow);
+    transition: border-color .2s;
+  }
+  .stat-card:hover { border-color: var(--muted); }
+  .stat-card-accent { border-color: var(--accent); }
+  .stat-card-accent:hover { border-color: var(--accent2); }
+  .stat-label {
+    font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--muted); margin-bottom: 8px;
+  }
+  .stat-value {
+    font-size: 26px; font-weight: 700;
+    color: var(--text); line-height: 1;
+    margin-bottom: 4px;
+    font-family: 'Inter', sans-serif;
+  }
+  .stat-card-accent .stat-value { color: var(--accent); }
+  .stat-sub {
+    font-size: 11px; color: var(--muted);
+    font-family: monospace;
+  }
+
+  /* ── Banner pendente ── */
+  .banner-pendente {
+    background: rgba(200,150,12,.1);
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    padding: 12px 16px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    font-size: 13px;
+  }
+  .banner-pendente strong { color: var(--accent); }
+  .banner-actions { display: flex; gap: 8px; flex-shrink: 0; }
+  .btn-banner-export {
+    background: var(--accent); color: #fff;
+    border: none; border-radius: 6px; padding: 6px 14px;
+    font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit;
+  }
+  .btn-banner-export:hover { background: var(--accent2); }
+  .btn-banner-discard {
+    background: none; border: 1px solid var(--border);
+    color: var(--muted); border-radius: 6px; padding: 6px 12px;
+    font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  .btn-banner-discard:hover { border-color: var(--red); color: var(--red); }
+
+  .btn-clear {
+    background: none; border: 1px solid var(--border);
+    color: var(--muted); border-radius: var(--radius);
+    padding: 9px 16px; font-family: inherit;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: all .18s;
+  }
+  .btn-clear:hover { border-color: var(--red); color: var(--red); }
+
+  /* ── Keyboard focus in dropdown ── */
+  .fazenda-item.kb-focus { background: var(--surface2); border-left-color: var(--accent); }
+
+  /* ── Context Menu ── */
+  .ctx-menu {
+    position: fixed;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.35);
+    padding: 4px; z-index: 500;
+    display: none; min-width: 200px;
+  }
+  .ctx-menu.open { display: block; }
+  .ctx-menu-item {
+    padding: 9px 14px; font-size: 13px; cursor: pointer;
+    border-radius: 5px;
+    display: flex; align-items: center; gap: 8px;
+    transition: background .12s; color: var(--text);
+  }
+  .ctx-menu-item:hover { background: var(--surface2); }
+  .ctx-menu-item.already { color: var(--muted); cursor: default; }
+  .ctx-menu-item.already:hover { background: none; }
+
+  /* ── Clear Confirm Modal ── */
+  .clear-confirm-body { font-size: 14px; color: var(--text); margin-bottom: 10px; }
+  .clear-confirm-warn { font-size: 12px; color: var(--red); margin-bottom: 24px; }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed; bottom: 72px; right: 24px;
+    background: var(--green); color: #fff;
+    padding: 10px 18px; border-radius: var(--radius);
+    font-size: 13px; font-weight: 600;
+    transform: translateY(16px); opacity: 0;
+    transition: all .25s; pointer-events: none;
+    font-family: monospace; z-index: 999;
+    box-shadow: 0 4px 12px rgba(0,0,0,.25);
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.6);
+    display: none; align-items: center; justify-content: center;
+    z-index: 200; backdrop-filter: blur(2px);
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 26px;
+    width: 400px;
+    max-width: 92vw;
+    max-height: 88vh;
+    overflow-y: auto;
+    box-shadow: 0 12px 40px rgba(0,0,0,.35);
+  }
+  .modal h3 { font-size: 17px; font-weight: 700; margin-bottom: 18px; }
+  .modal-field { margin-bottom: 14px; }
+  .modal-field label {
+    display: block; font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px;
+    color: var(--muted); margin-bottom: 5px;
+  }
+  .modal-field input, .modal-field select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 9px 12px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+    transition: border-color .2s;
+  }
+  .modal-field input:focus, .modal-field select:focus { border-color: var(--accent); }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+  .btn-modal-cancel {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); border-radius: var(--radius);
+    padding: 8px 18px; font-family: inherit;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: border-color .2s;
+  }
+  .btn-modal-cancel:hover { border-color: var(--muted); }
+  .btn-modal-ok {
+    background: var(--accent); color: #fff;
+    border: none; border-radius: var(--radius);
+    padding: 8px 18px; font-family: inherit;
+    font-size: 13px; font-weight: 700; cursor: pointer;
+    transition: background .2s;
+  }
+  .btn-modal-ok:hover { background: var(--accent2); }
+  .btn-modal-ok:disabled, .btn-modal-cancel:disabled { opacity: .35; cursor: default; }
+  .no-records {
+    padding: 36px; text-align: center;
+    color: var(--muted); font-size: 13px;
+    font-family: monospace;
+  }
+
+  /* ── Nav tabs ── */
+  .nav-tabs { display: flex; gap: 4px; }
+  .nav-tab {
+    background: none; border: 1px solid transparent; border-radius: 6px;
+    padding: 6px 14px; font-size: 13px; font-weight: 600;
+    color: var(--muted); cursor: pointer; transition: all .15s; font-family: inherit;
+  }
+  .nav-tab:hover  { border-color: var(--border); color: var(--text); }
+  .nav-tab.active { border-color: var(--accent); color: var(--accent);
+                    background: rgba(200,150,12,.08); }
+
+  /* ── Views ── */
+  #viewDashboard    { flex: 1; overflow-y: auto; }
+  #viewPreenchimento { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+  #viewPreenchimento > .app { flex: 1; overflow: hidden; }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 260px; flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .sidebar-header {
+    padding: 14px 16px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .sidebar-title {
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted);
+  }
+  .plan-count {
+    font-size: 11px; font-weight: 700; font-family: monospace;
+    color: var(--accent);
+  }
+  .plan-search-wrap {
+    padding: 10px 12px; border-bottom: 1px solid var(--border);
+    position: relative; flex-shrink: 0;
+  }
+  .plan-search-wrap input {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 7px 10px;
+    color: var(--text); font-family: inherit; font-size: 12px;
+    outline: none; transition: border-color .2s;
+  }
+  .plan-search-wrap input:focus { border-color: var(--accent); }
+  .plan-dropdown {
+    position: absolute; top: calc(100% - 2px); left: 12px; right: 12px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); max-height: 240px; overflow-y: auto;
+    z-index: 60; box-shadow: 0 8px 24px rgba(0,0,0,.25);
+    display: none;
+  }
+  .plan-dropdown.open { display: block; }
+  .plan-dropdown-item {
+    padding: 8px 12px; cursor: pointer; font-size: 12px;
+    border-left: 3px solid transparent; transition: all .1s;
+  }
+  .plan-dropdown-item:hover { background: var(--surface2); border-left-color: var(--accent); }
+  .plan-dropdown-item.already { opacity: .4; cursor: default; pointer-events: none; }
+  .plan-list { flex: 1; overflow-y: auto; padding: 6px 0; }
+  .plan-list::-webkit-scrollbar { width: 3px; }
+  .plan-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .plan-empty { padding: 24px 16px; text-align: center;
+    font-size: 12px; color: var(--muted); font-family: monospace; }
+  .plan-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; cursor: pointer; transition: background .1s;
+    border-left: 3px solid transparent;
+  }
+  .plan-item:hover { background: var(--surface2); border-left-color: var(--border); }
+  .plan-item.done  { border-left-color: var(--green); }
+  .plan-item.done:hover { background: var(--surface2); }
+  .plan-check { font-size: 13px; color: var(--muted); flex-shrink: 0; width: 16px; }
+  .plan-item.done .plan-check { color: var(--green); }
+  .plan-item-info { flex: 1; min-width: 0; }
+  .plan-item-name {
+    font-size: 12px; font-weight: 600; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .plan-item.done .plan-item-name { text-decoration: line-through; color: var(--muted); }
+  .plan-item-meta { font-size: 10px; color: var(--muted); font-family: monospace; margin-top: 2px;
+    display: flex; gap: 4px; flex-wrap: wrap; }
+  .plan-item-del {
+    background: none; border: none; color: var(--muted);
+    cursor: pointer; font-size: 12px; padding: 2px 4px;
+    border-radius: 3px; transition: color .12s; flex-shrink: 0;
+  }
+  .plan-item-del:hover { color: var(--red); }
+  .sidebar-footer {
+    padding: 10px 12px; border-top: 1px solid var(--border); flex-shrink: 0;
+  }
+  .btn-clear-plan {
+    width: 100%; background: none; border: 1px solid var(--border);
+    color: var(--muted); border-radius: var(--radius); padding: 7px;
+    font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+    transition: all .15s;
+  }
+  .btn-clear-plan:hover { border-color: var(--red); color: var(--red); }
+
+  /* ── Tags de status/ciclo ── */
+  .faz-tag {
+    display: inline-block; padding: 1px 5px; border-radius: 3px;
+    font-size: 9px; font-weight: 700; letter-spacing: 0.4px;
+    text-transform: uppercase; font-family: monospace; white-space: nowrap;
+  }
+  .faz-tag-green  { background: rgba(76,175,114,.15);  color: var(--green);  }
+  .faz-tag-accent { background: rgba(200,150,12,.15);  color: var(--accent); }
+  .faz-tag-blue   { background: rgba(90,159,212,.15);  color: var(--blue);   }
+  .faz-tag-muted  { background: rgba(122,136,117,.15); color: var(--muted);  }
+
+  /* ── Dashboard ── */
+  .dash-page {
+    max-width: 1280px; margin: 0 auto;
+    padding: 28px 32px; display: flex; flex-direction: column; gap: 20px;
+  }
+  .dash-header {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding-bottom: 16px; border-bottom: 1px solid var(--border);
+  }
+  .dash-header-title {
+    font-size: 13px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+  }
+  .dash-header-sub { font-size: 11px; color: var(--muted); font-family: monospace; }
+
+  .dash-kpi-row { display: grid; grid-template-columns: repeat(5,1fr); gap: 14px; }
+  .dash-kpi-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 18px 20px; box-shadow: var(--shadow);
+    transition: border-color .2s; position: relative; overflow: hidden;
+  }
+  .dash-kpi-card::after {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: var(--border); border-radius: 10px 10px 0 0;
+  }
+  .dash-kpi-card.green::after  { background: var(--green); }
+  .dash-kpi-card.accent::after { background: var(--accent); }
+  .dash-kpi-card.blue::after   { background: var(--blue); }
+  .dash-kpi-card:hover { border-color: var(--muted); }
+  .dash-kpi-label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1.5px; color: var(--muted); margin-bottom: 10px;
+  }
+  .dash-kpi-value {
+    font-size: 30px; font-weight: 800; line-height: 1; margin-bottom: 6px;
+    letter-spacing: -0.5px;
+  }
+  .dash-kpi-card.green  .dash-kpi-value { color: var(--green); }
+  .dash-kpi-card.accent .dash-kpi-value { color: var(--accent); }
+  .dash-kpi-card.blue   .dash-kpi-value { color: var(--blue); }
+  .dash-kpi-sub { font-size: 11px; color: var(--muted); line-height: 1.4; }
+
+  .dash-progress-wrap {
+    display: flex; align-items: center; gap: 14px; padding: 4px 0;
+  }
+  .dash-progress-label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1.5px; color: var(--muted); white-space: nowrap;
+  }
+  .dash-progress-bar {
+    flex: 1; height: 10px; background: var(--surface2);
+    border-radius: 99px; overflow: hidden; border: 1px solid var(--border);
+  }
+  .dash-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green), var(--accent));
+    border-radius: 99px; transition: width .8s cubic-bezier(.4,0,.2,1);
+    width: 0%;
+  }
+  [data-theme="light"] .dash-progress-fill {
+    background: linear-gradient(90deg, var(--green), var(--blue));
+  }
+  .dash-progress-pct {
+    font-size: 14px; font-weight: 800; color: var(--green); min-width: 42px; text-align: right;
+  }
+
+  .dash-charts-flex { display: flex; gap: 20px; }
+  .dash-charts-flex > * { flex: 1; min-width: 0; }
+  .dash-chart-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 20px 22px; box-shadow: var(--shadow);
+  }
+  .dash-chart-title {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1.5px; color: var(--muted); margin-bottom: 16px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-mark">PLT</div>
+    <div>
+      <div class="logo-text">PROGRAMAÇÃO PLANTIO</div>
+      <div class="logo-sub">sistema de preenchimento</div>
+    </div>
+  </div>
+  <nav class="nav-tabs">
+    <button class="nav-tab active" id="tabDash" onclick="setView('dashboard')">Dashboards</button>
+    <button class="nav-tab" id="tabWork" onclick="setView('preenchimento')">Registros</button>
+    <button class="nav-tab" id="tabConsulta" onclick="setView('consulta')">Consultas</button>
+  </nav>
+  <div class="header-right">
+    <div class="theme-toggle" onclick="toggleTheme()" id="themeToggle" title="Alternar tema">&#9790;</div>
+    <div class="user-badge" onclick="openUserModal()" id="userBadge">Selecionar usuário</div>
+  </div>
+</header>
+
+<!-- ══ Tela 1: Dashboard ══════════════════════════════════════════════════ -->
+<div id="viewDashboard">
+  <div class="dash-page">
+
+    <!-- Cabeçalho -->
+    <div class="dash-header">
+      <div class="dash-header-title">Painel de Controle — PROGRAMAÇÃO PLANTIO</div>
+      <div class="dash-header-sub" id="dashTimestamp">—</div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div id="dashKpiRow" class="dash-kpi-row"></div>
+
+    <!-- Barra de progresso geral -->
+    <div class="dash-progress-wrap">
+      <span class="dash-progress-label">Progresso geral</span>
+      <div class="dash-progress-bar"><div class="dash-progress-fill" id="dashProgressFill"></div></div>
+      <span class="dash-progress-pct" id="dashProgressPct">0%</span>
+    </div>
+
+    <!-- Linha: Ha por Mês + Ha por Frente -->
+    <div class="dash-charts-flex">
+      <div class="dash-chart-card">
+        <div class="dash-chart-title">Ha Programado por Mês</div>
+        <canvas id="chartMes" height="220"></canvas>
+      </div>
+      <div class="dash-chart-card" style="overflow:hidden; min-width:0; display:flex; flex-direction:column">
+        <div class="dash-chart-title">Ha por Frente</div>
+        <div id="chartFrenteWrap" style="position:relative; width:100%; flex:1; min-height:180px">
+          <canvas id="chartFrente"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Linha: Ha por Usuário + Talhões 18m -->
+    <div class="dash-charts-flex">
+      <div class="dash-chart-card" id="chartUsuarioCard" style="display:none">
+        <div class="dash-chart-title">Ha por Usuário — Log de Exportações</div>
+        <canvas id="chartUsuario" height="200"></canvas>
+      </div>
+      <div class="dash-chart-card">
+        <div class="dash-chart-title">Talhões 18m — Total / Concluído / A Fazer</div>
+        <canvas id="chart18m" height="200"></canvas>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ Tela 2: Preenchimento ══════════════════════════════════════════════ -->
+<div id="viewPreenchimento" style="display:none">
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <span class="sidebar-title">PLANO DA SEMANA</span>
+      <span class="plan-count" id="planCount">0/0</span>
+    </div>
+    <div class="plan-search-wrap">
+      <input type="text" id="planSearch" placeholder="+ Adicionar fazenda..."
+             oninput="renderPlanDropdown(this.value)" onfocus="renderPlanDropdown(this.value)"
+             autocomplete="off">
+      <div class="plan-dropdown" id="planDropdown"></div>
+    </div>
+    <div class="plan-list" id="planList">
+      <div class="plan-empty">Nenhuma fazenda no plano</div>
+    </div>
+    <div class="sidebar-footer">
+      <button class="btn-clear-plan" onclick="limparPlano()">Limpar lista</button>
+    </div>
+  </aside>
+  <div class="main" id="mainArea">
+
+    <!-- Banner registros pendentes -->
+    <div id="bannerPendente" style="display:none"></div>
+
+    <!-- Cards de resumo -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label" id="statLabel1">Base ICOL</div>
+        <div class="stat-value" id="statFazendas">—</div>
+        <div class="stat-sub" id="statTalhoes">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Registrado hoje</div>
+        <div class="stat-value" id="statRegFazendas">0</div>
+        <div class="stat-sub" id="statRegTalhoes">0 talhões</div>
+      </div>
+      <div class="stat-card stat-card-accent">
+        <div class="stat-label">Área hoje</div>
+        <div class="stat-value" id="statHa">0,0</div>
+        <div class="stat-sub">hectares</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Progresso</div>
+        <div class="stat-value" id="statPct">0%</div>
+        <div class="stat-sub" id="statProgSub">0 de — fazendas</div>
+      </div>
+    </div>
+
+    <!-- Seletor de Fazenda -->
+    <div class="faz-selector">
+      <div class="faz-selector-row">
+        <span class="faz-selector-label" id="sidebarTitle">Fazendas</span>
+        <div class="faz-search-wrap">
+          <input type="text" id="searchFaz" placeholder="Buscar fazenda por nome ou código..."
+                 oninput="filterFazendas(this.value); _dropIdx=-1;"
+                 onfocus="openFazDropdown()"
+                 onkeydown="onFazSearchKey(event)"
+                 autocomplete="off">
+          <div class="faz-dropdown" id="fazDropdown">
+            <div id="fazendaList"></div>
+          </div>
+        </div>
+        <div class="faz-selected-badge" id="fazSelectedBadge" style="display:none"></div>
+      </div>
+      <div class="faz-filter-row">
+        <span class="faz-filter-label">Filtro:</span>
+        <button class="faz-filter-btn" id="filterAFazer" onclick="setFazFilter('a_fazer')">A Fazer</button>
+        <button class="faz-filter-btn" id="filterMes" onclick="setFazFilter('mes_atual')">Mês</button><select id="mesFilter" class="mes-filter-select" onchange="onMesFilterChange()"></select>
+        <button class="faz-filter-btn" id="filter18m"   onclick="setFazFilter('18m')">18m</button>
+      </div>
+    </div>
+
+    <div class="placeholder" id="placeholder">
+      <div class="placeholder-icon">&#127807;</div>
+      <div class="placeholder-text">Selecione uma fazenda para preencher</div>
+    </div>
+
+    <!-- Form -->
+    <div id="formArea" style="display:none">
+      <div class="form-card">
+        <div class="form-card-header">
+          <div class="form-card-title">
+            <span id="formFazTitle">—</span>
+            <span class="frente-tag" id="formFrenteTag">—</span>
+          </div>
+          <div style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace" id="formCodTag">—</div>
+        </div>
+        <div class="form-card-body">
+
+          <!-- Cobertura -->
+          <div class="cob-toggle">
+            <button class="cob-btn active" id="btnInteira" onclick="setCobertura('inteira')">Fazenda Inteira</button>
+            <button class="cob-btn" id="btnParcial" onclick="setCobertura('parcial')">Parcial</button>
+          </div>
+
+          <!-- Talhões -->
+          <div class="talhoes-section">
+            <div class="talhoes-label">
+              <span>Talhões <span id="talSel" style="color:var(--accent)"></span></span>
+              <div class="talhoes-actions" id="talActions" style="display:none">
+                <button class="link-btn" onclick="select18mTal()" style="color:var(--red)">18m</button>
+                <button class="link-btn" onclick="selectAllTal()">todos</button>
+                <button class="link-btn" onclick="selectRestantesTal()">restantes</button>
+                <button class="link-btn" onclick="clearAllTal()">limpar</button>
+              </div>
+            </div>
+            <div class="talhoes-grid" id="talhoesGrid"></div>
+          </div>
+
+          <!-- Campos -->
+          <div class="fields-row">
+            <div class="field-group">
+              <label>Tipo de Linha</label>
+              <select id="selTipo">
+                <option value="">— selecione —</option>
+                <option value="VANT">Linha de Vant</option>
+                <option value="PROJETO">Desdobra de Plantio</option>
+                <option value="SEM LINHAS">Sem Linhas</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label>Ciclo</label>
+              <select id="selCiclo">
+                <option value="">— selecione —</option>
+                <option value="25-26">25-26</option>
+                <option value="26-27">26-27</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label>Status</label>
+              <select id="selStatus">
+                <option value="">— selecione —</option>
+                <option value="CONCLUIDO">Concluído</option>
+                <option value="A FAZER">A Fazer</option>
+                <option value="SEM LINHAS">Sem Linhas</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Submit -->
+          <div class="submit-row">
+            <div class="submit-info" id="submitInfo">selecione os campos acima</div>
+            <button class="btn-submit" id="btnSubmit" onclick="registrar()" disabled>Registrar →</button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Log -->
+    <div class="log-section" id="logSection">
+      <div class="section-title">Registros do dia</div>
+      <div class="log-table-wrap">
+        <div id="logContent"><div class="no-records">nenhum registro ainda</div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<!-- Export bar (só na tela de preenchimento) -->
+<div class="export-bar" id="exportBar" style="display:none">
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="export-info" id="exportInfo">0 registros</div>
+    <button class="btn-clear" id="btnClear" onclick="limparRegistros()" style="display:none">&#128465; Limpar</button>
+  </div>
+  <div style="display:flex;align-items:center;gap:6px">
+    <button class="btn-export" id="btnExport" onclick="consolidar()" disabled>Consolidar</button>
+  </div>
+</div>
+
+<!-- ══ Tela 3: Consulta ════════════════════════════════════════════════════ -->
+<div id="viewConsulta" class="dash-page" style="display:none">
+  <div class="faz-selector">
+    <div class="faz-selector-row">
+      <span class="faz-selector-label">Fazendas</span>
+      <div class="faz-search-wrap">
+        <input type="text" id="consultaSearch"
+               placeholder="Pesquisar fazenda por nome ou código..."
+               oninput="debouncedRenderConsulta()"
+               autocomplete="off">
+      </div>
+    </div>
+    <div class="faz-filter-row">
+      <span class="faz-filter-label">Filtro:</span>
+      <select id="cFiltroMes" class="mes-filter-select" onchange="renderConsulta()">
+        <option value="">— todos os meses —</option>
+      </select>
+      <select id="cFiltroFrente" class="mes-filter-select" onchange="renderConsulta()">
+        <option value="">— todas as frentes —</option>
+      </select>
+      <select id="cFiltroStatus" class="mes-filter-select" onchange="renderConsulta()">
+        <option value="">— todos os status —</option>
+        <option value="A FAZER">A Fazer</option>
+        <option value="CONCLUÍDO">Concluído</option>
+      </select>
+      <button class="faz-filter-btn" id="btnConsultaSel" onclick="toggleConsultaSelectMode()">&#9744; Selecionar</button>
+      <button class="faz-filter-btn" onclick="limparFiltrosConsulta()">Limpar</button>
+      <span class="consulta-filter-count" id="consultaCount"></span>
+    </div>
+  </div>
+  <div id="consultaSelBar" class="consulta-sel-bar">
+    <span id="consultaSelCount"></span>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button class="btn-sel-add" onclick="addSelectedToPlano()">+ Adicionar à lista</button>
+      <button class="btn-sel-clear" onclick="clearConsultaSel()" title="Limpar seleção">&times;</button>
+    </div>
+  </div>
+  <div id="consultaResults"></div>
+</div>
+
+<!-- Context Menu -->
+<div id="ctxMenu" class="ctx-menu">
+  <div class="ctx-menu-item" id="ctxAddPlanItem" onclick="ctxAddToPlan()"></div>
+</div>
+
+<!-- Plan Context Menu -->
+<div id="planCtxMenu" class="ctx-menu">
+  <div class="ctx-menu-item" id="planCtxDoneItem" onclick="planCtxConcluir()">&#9733; Marcar como feita</div>
+  <div class="ctx-menu-item" onclick="planCtxAbrir()">&#8594; Abrir fazenda</div>
+  <div class="ctx-menu-item" style="color:var(--red)" onclick="planCtxRemover()">&#10005; Remover do plano</div>
+</div>
+
+<!-- Clear Confirm Modal -->
+<div class="modal-overlay" id="clearConfirmOverlay" onclick="if(event.target===this)closeClearConfirm()">
+  <div class="modal" style="max-width:360px">
+    <h3 style="color:var(--red)">Limpar registros</h3>
+    <p class="clear-confirm-body" id="clearConfirmMsg"></p>
+    <p class="clear-confirm-warn">&#9888;&#65039; Esta ação não pode ser desfeita.</p>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn-modal-cancel" onclick="closeClearConfirm()">Cancelar</button>
+      <button class="btn-modal-ok" id="btnConfirmLimpar" onclick="confirmLimpar()" style="background:var(--red)">Limpar tudo</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Modal Edição -->
+<div class="modal-overlay" id="editOverlay">
+  <div class="modal">
+    <h3>Editar Registro</h3>
+    <div class="modal-field">
+      <label>Tipo de Linha</label>
+      <select id="editTipo">
+        <option value="VANT">Linha de Vant</option>
+        <option value="PROJETO">Desdobra de Plantio</option>
+        <option value="SEM LINHAS">Sem Linhas</option>
+      </select>
+    </div>
+    <div class="modal-field">
+      <label>Ciclo</label>
+      <select id="editCiclo">
+        <option value="25-26">25-26</option>
+        <option value="26-27">26-27</option>
+      </select>
+    </div>
+    <div class="modal-field">
+      <label>Status</label>
+      <select id="editStatus">
+        <option value="CONCLUIDO">Concluído</option>
+        <option value="A FAZER">A Fazer</option>
+        <option value="SEM LINHAS">Sem Linhas</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closeEditModal()">Cancelar</button>
+      <button class="btn-modal-ok" onclick="saveEdit()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Consolidar -->
+<div class="modal-overlay" id="consolidarOverlay">
+  <div class="modal" style="max-width:600px;width:92%">
+    <h3 id="consolidarTitle">Consolidando...</h3>
+    <div id="consolidarBody" style="margin:12px 0"></div>
+    <div class="modal-actions" id="consolidarActions" style="display:none">
+      <button class="btn-modal-cancel" id="btnConsolidarFallback" onclick="_baixarFallback()" style="display:none">⬇ Baixar XLSX</button>
+      <button class="btn-modal-cancel" id="btnConsolidarLimpar" onclick="_limparFallback()" style="display:none">🗑 Limpar registros</button>
+      <button class="btn-modal-ok" id="btnFecharConsolidar" onclick="fecharConsolidar()">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Usuários -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <!-- Seção: Selecionar usuário -->
+    <div id="modalSelectSection">
+      <h3>Usuários</h3>
+      <div class="modal-field">
+        <label>Selecione o usuário ativo</label>
+        <div class="user-chips" id="userChips"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-modal-cancel" onclick="openAdminSection()">⚙ Gerenciar</button>
+        <button class="btn-modal-ok" onclick="closeUserModal()">Fechar</button>
+      </div>
+    </div>
+    <!-- Seção: Admin / Gerenciar usuários -->
+    <div id="modalAdminSection" style="display:none">
+      <h3>Gerenciar Usuários</h3>
+      <div id="adminSyncWarning" style="display:none;color:var(--accent);font-size:11px;
+           padding:6px 8px;border:1px solid var(--accent);border-radius:4px;margin-bottom:8px">
+        ⚠ Alterações locais não aplicadas a todos — exporte e rode ATUALIZAR.bat para propagar.
+      </div>
+      <div id="adminUserList" style="max-height:220px;overflow-y:auto"></div>
+      <div class="admin-section">
+        <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px">Novo usuário</label>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+          <input type="text" id="inputAdminUser" placeholder="Nome" style="flex:1">
+          <label class="admin-perfil-check"><input type="checkbox" id="chkPreenchimento" checked> Preencher</label>
+          <label class="admin-perfil-check"><input type="checkbox" id="chkDashboard" checked> Dashboard</label>
+          <button class="btn-modal-ok" onclick="adminAddUser()" style="padding:8px 14px;white-space:nowrap">+</button>
+        </div>
+      </div>
+      <p class="admin-note">Para aplicar em todos os computadores: clique em "Exportar", salve o arquivo <strong>usuarios.json</strong> na pasta do projeto e rode <strong>ATUALIZAR.bat</strong>.</p>
+
+      <div class="admin-section">
+        <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px">Atualizar base ICOL / Fazendas</label>
+
+        <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+          <span style="font-size:12px;flex:1">Base ICOL (.xlsm)</span>
+          <input type="file" id="inputBaseIcol" accept=".xlsm" style="font-size:11px;max-width:170px">
+          <button class="btn-modal-cancel" style="padding:4px 8px;font-size:11px" onclick="_toggleInfoBase('icol')" title="Formato esperado">ⓘ</button>
+        </div>
+        <div id="infoBaseIcol" style="display:none;font-size:11px;color:var(--muted);background:var(--surface2);border-radius:6px;padding:8px;margin-top:6px">
+          Aba <strong>"BASE PARA PLANEJAMENTO"</strong>, sem cabeçalho fixo: o sistema usa a primeira
+          linha em que a <strong>coluna AA</strong> tiver um número como início dos dados.
+          <strong>Coluna H</strong> = FRENTE, <strong>coluna I</strong> = PERÍODO OP (mês),
+          <strong>coluna AA</strong> = COD FAZ, <strong>coluna AB</strong> = FAZENDA. Uma linha por fazenda.
+          <div style="margin-top:6px"><button class="btn-modal-cancel" style="font-size:11px" onclick="_baixarModeloICOL()">⬇ Baixar modelo</button></div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+          <span style="font-size:12px;flex:1">Base de fazendas (.xlsx)</span>
+          <input type="file" id="inputBaseFazendas" accept=".xlsx" style="font-size:11px;max-width:170px">
+          <button class="btn-modal-cancel" style="padding:4px 8px;font-size:11px" onclick="_toggleInfoBase('fazendas')" title="Formato esperado">ⓘ</button>
+        </div>
+        <div id="infoBaseFazendas" style="display:none;font-size:11px;color:var(--muted);background:var(--surface2);border-radius:6px;padding:8px;margin-top:6px">
+          Cabeçalho na primeira linha, com as colunas <strong>SECAO</strong> (código da fazenda),
+          <strong>DESC_SECAO</strong> (nome da fazenda), <strong>TALHAO</strong> (número do talhão),
+          <strong>AREA_PROD</strong> (área em ha) e <strong>ESTAGIO</strong> (opcional). Uma linha por
+          talhão — toda fazenda do ICOL precisa ter aqui os seus talhões, senão é ignorada.
+          <div style="margin-top:6px"><button class="btn-modal-cancel" style="font-size:11px" onclick="_baixarModeloBaseFazendas()">⬇ Baixar modelo</button></div>
+        </div>
+
+        <div style="margin-top:10px">
+          <button class="btn-modal-ok" onclick="processarAtualizacaoBase()">Processar e atualizar</button>
+        </div>
+        <div id="logBaseAtualizacao" style="margin-top:8px;font-size:11px;line-height:1.8"></div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-modal-cancel" onclick="adminExportJson()">💾 Salvar e exportar usuarios.json</button>
+        <button class="btn-modal-ok" onclick="closeAdminSection()">← Voltar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Servidor de consolidação ──────────────────────────────────────────────
+const SERVIDOR_URL = 'http://10.120.107.81:5678';
+
+// ── Data ──────────────────────────────────────────────────────────────────
+const USUARIOS_HA = {};
+const USUARIOS_CONFIG = [];
+const FAZENDAS = {};
+const FAZENDA_NAMES = Object.keys(FAZENDAS).sort();
+let currentNames = FAZENDA_NAMES;
+let activeFilters = new Set();
+
+// ── Upload de arquivos de projeto (.dwg/.zip) para Releases do GitHub ─────
+// Feito via proxy (Cloudflare Worker) — o token do GitHub fica guardado lá como
+// secret, nunca neste arquivo (que é público). Ver cloudflare-worker/release-proxy.js.
+const RELEASE_PROXY_URL = 'PLACEHOLDER_PLANTIO_PROXY_URL';
+const RE_ARQ_PROJETO = /^(\d+)_.+_(Rev\d+|Exp\d+)\.(dwg|zip|pdf)$/i;
+
+// ── Banco de dados (Supabase) ─────────────────────────────────────────────
+// Publishable key — feita para ser pública; segurança vem das policies de RLS.
+const SUPABASE_URL = 'PLACEHOLDER_PLANTIO_SUPABASE_URL';
+const SUPABASE_KEY = 'PLACEHOLDER_PLANTIO_SUPABASE_KEY';
+
+// COD FAZ com este prefixo são unidades administrativas (espelha config.json:codfaz_excluir_prefixo)
+const CODFAZ_EXCLUIR_PREFIXO = '20';
+
+function _sbHeaders(extra) {
+  return Object.assign({
+    'apikey': SUPABASE_KEY,
+    'Authorization': `Bearer ${SUPABASE_KEY}`,
+  }, extra || {});
+}
+
+// PostgREST limita a 1000 linhas por requisição — busca todas as páginas.
+async function _sbFetchAll(url) {
+  const PAGE = 1000;
+  let offset = 0;
+  let all = [];
+  while (true) {
+    const res = await fetch(url, { headers: _sbHeaders({ 'Range-Unit': 'items', 'Range': `${offset}-${offset + PAGE - 1}` }) });
+    if (!res.ok) throw new Error(`${url}: ${res.status}`);
+    const page = await res.json();
+    all = all.concat(page);
+    if (page.length < PAGE) break;
+    offset += PAGE;
+  }
+  return all;
+}
+
+// Carrega FAZENDAS/USUARIOS_HA/USUARIOS_CONFIG do Supabase, substituindo os
+// dados embutidos (mantidos como seed/fallback caso a requisição falhe).
+async function carregarDadosSupabase() {
+  try {
+    const [programacao, logs, usuarios] = await Promise.all([
+      _sbFetchAll(`${SUPABASE_URL}/rest/v1/programacao?select=*`),
+      _sbFetchAll(`${SUPABASE_URL}/rest/v1/log_exportacoes?select=usuario,layer,data_consolidacao&order=data_consolidacao.asc`),
+      _sbFetchAll(`${SUPABASE_URL}/rest/v1/usuarios?select=*`),
+    ]);
+    if (!programacao.length) return;
+
+    for (const k of Object.keys(FAZENDAS)) delete FAZENDAS[k];
+    const layerHa = {};
+    for (const row of programacao) {
+      const faz = row.fazenda;
+      if (!faz) continue;
+      if (!FAZENDAS[faz]) FAZENDAS[faz] = { cod: row.cod_faz, talhoes: {} };
+      FAZENDAS[faz].talhoes[String(row.talhao)] = {
+        layer: row.layer, frente: row.frente, semana: row.periodo_op,
+        exp: row.status || '', tipo: row.tipo_linha || '', ciclo: row.ciclo || '',
+        ha: row.area_ha || 0, dia: null, estagio: row.estagio || ''
+      };
+      layerHa[String(row.layer)] = row.area_ha || 0;
+    }
+
+    FAZENDA_NAMES.length = 0;
+    Object.keys(FAZENDAS).sort().forEach(n => FAZENDA_NAMES.push(n));
+
+    const ultimoPorLayer = new Map();
+    for (const row of logs) ultimoPorLayer.set(String(row.layer), row.usuario);
+    const novoUsuarioHa = {};
+    for (const [layer, usuario] of ultimoPorLayer) {
+      if (!usuario) continue;
+      novoUsuarioHa[usuario] = Math.round(((novoUsuarioHa[usuario] || 0) + (layerHa[layer] || 0)) * 100) / 100;
+    }
+    for (const k of Object.keys(USUARIOS_HA)) delete USUARIOS_HA[k];
+    Object.assign(USUARIOS_HA, novoUsuarioHa);
+
+    if (usuarios.length) {
+      USUARIOS_CONFIG.length = 0;
+      usuarios.forEach(u => USUARIOS_CONFIG.push({ nome: u.nome, perfis: u.perfis || [] }));
+      adminConfig = USUARIOS_CONFIG.map(u => ({ nome: u.nome.toLowerCase(), perfis: u.perfis || ['preenchimento','dashboard'] }));
+    }
+  } catch (e) {
+    console.error('Falha ao carregar dados do Supabase — usando dados locais embutidos:', e);
+  }
+}
+
+// ── Atualizar base ICOL/Fazendas direto pelo navegador ────────────────────
+function _toggleInfoBase(which) {
+  const el = document.getElementById(which === 'icol' ? 'infoBaseIcol' : 'infoBaseFazendas');
+  el.style.display = el.style.display === 'none' ? '' : 'none';
+}
+
+function _baixarModeloICOL() {
+  const row = (vals) => {
+    const arr = new Array(28).fill('');
+    for (const [i, v] of Object.entries(vals)) arr[+i] = v;
+    return arr;
+  };
+  const data = [
+    row({ 0: 'Linhas acima da primeira com número na coluna AA (COD FAZ) são ignoradas.' }),
+    row({ 7: 'FRENTE', 8: 'PERÍODO OP', 26: 'COD FAZ', 27: 'FAZENDA' }),
+    row({ 7: 2, 8: 6, 26: 10503, 27: 'SANTA LUZIA 5' }),
+    row({ 7: 3, 8: 7, 26: 10504, 27: 'SANTA LUZIA 6' }),
+  ];
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  XLSX.utils.book_append_sheet(wb, ws, 'BASE PARA PLANEJAMENTO');
+  XLSX.writeFile(wb, 'modelo_base_icol.xlsx');
+}
+
+function _baixarModeloBaseFazendas() {
+  const data = [
+    ['SECAO', 'DESC_SECAO', 'TALHAO', 'AREA_PROD', 'ESTAGIO'],
+    [10503, 'SANTA LUZIA 5', 1, 25.4, 'SOQUEIRA'],
+    [10503, 'SANTA LUZIA 5', 2, 18.9, 'CANA PLANTA'],
+    [10504, 'SANTA LUZIA 6', 1, 32.1, 'SOQUEIRA'],
+  ];
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  XLSX.utils.book_append_sheet(wb, ws, 'Fazendas');
+  XLSX.writeFile(wb, 'modelo_base_fazendas.xlsx');
+}
+
+function _logBase(msg) {
+  const el = document.getElementById('logBaseAtualizacao');
+  if (el) el.insertAdjacentHTML('beforeend', `<div>${msg}</div>`);
+}
+
+async function processarAtualizacaoBase() {
+  const fIcol = document.getElementById('inputBaseIcol')?.files?.[0];
+  const fFaz  = document.getElementById('inputBaseFazendas')?.files?.[0];
+  const log = document.getElementById('logBaseAtualizacao');
+  if (log) log.innerHTML = '';
+
+  if (!fIcol || !fFaz) {
+    _logBase('<span style="color:var(--red)">Selecione os dois arquivos (ICOL e base de fazendas).</span>');
+    return;
+  }
+
+  try {
+    _logBase('Lendo arquivos...');
+    const [bufIcol, bufFaz] = await Promise.all([fIcol.arrayBuffer(), fFaz.arrayBuffer()]);
+    const wbIcol = XLSX.read(bufIcol, { type: 'array' });
+    const wbFaz  = XLSX.read(bufFaz,  { type: 'array' });
+
+    // ── Parse ICOL: aba "BASE PARA PLANEJAMENTO", colunas H/I/AA/AB por posição ──
+    const sheetName = wbIcol.SheetNames.find(n => n.trim().toUpperCase() === 'BASE PARA PLANEJAMENTO') || wbIcol.SheetNames[0];
+    const wsIcol = wbIcol.Sheets[sheetName];
+    const rowsIcol = XLSX.utils.sheet_to_json(wsIcol, { header: 1, raw: true });
+
+    let firstDataRow = -1;
+    for (let i = 0; i < rowsIcol.length; i++) {
+      const cell = rowsIcol[i]?.[26];
+      if (cell !== undefined && cell !== '' && !isNaN(Number(cell))) { firstDataRow = i; break; }
+    }
+    if (firstDataRow < 0) throw new Error('Não foi possível localizar dados na aba "BASE PARA PLANEJAMENTO" (coluna AA deve conter o COD FAZ).');
+
+    const icolMap = new Map(); // codFaz → {frente, periodoOp, fazenda}
+    for (let i = firstDataRow; i < rowsIcol.length; i++) {
+      const r = rowsIcol[i];
+      const cell = r?.[26];
+      if (cell === undefined || cell === '' || isNaN(Number(cell))) continue;
+      const codFaz = Number(cell);
+      if (icolMap.has(codFaz)) continue; // dedupe, mantém o primeiro
+      icolMap.set(codFaz, {
+        frente: Number(r?.[7]),
+        periodoOp: Number(r?.[8]),
+        fazenda: String(r?.[27] ?? '').trim(),
+      });
+    }
+    _logBase(`ICOL: ${icolMap.size} fazenda(s) única(s).`);
+
+    // ── Parse base de fazendas: aba 1, colunas por nome ──
+    const wsFaz = wbFaz.Sheets[wbFaz.SheetNames[0]];
+    const rowsFaz = XLSX.utils.sheet_to_json(wsFaz, { raw: true });
+    const fazPorCod = new Map(); // codFaz → [{ talhao, areaHa, estagio }]
+    for (const r of rowsFaz) {
+      const codFaz = Number(r['SECAO']);
+      const talhao = Number(r['TALHAO']);
+      if (isNaN(codFaz) || isNaN(talhao)) continue;
+      const areaHa = Math.round((Number(r['AREA_PROD']) || 0) * 100) / 100;
+      const estagio = String(r['ESTAGIO'] ?? '').trim();
+      if (!fazPorCod.has(codFaz)) fazPorCod.set(codFaz, []);
+      fazPorCod.get(codFaz).push({ talhao, areaHa, estagio });
+    }
+    _logBase(`Base fazendas: ${rowsFaz.length} talhão(ões) lidos.`);
+
+    // ── Merge ICOL × base de fazendas ──
+    let semBase = 0;
+    let excluidasAdmin = 0;
+    const progRows = [];
+    for (const [codFaz, icolRow] of icolMap) {
+      if (String(codFaz).startsWith(CODFAZ_EXCLUIR_PREFIXO)) { excluidasAdmin++; continue; }
+      const talhoes = fazPorCod.get(codFaz);
+      if (!talhoes || !talhoes.length) { semBase++; continue; }
+      for (const t of talhoes) {
+        const layer = Number(`${codFaz}${String(t.talhao).padStart(3, '0')}`);
+        progRows.push({
+          layer, frente: icolRow.frente, periodo_op: icolRow.periodoOp,
+          cod_faz: codFaz, fazenda: icolRow.fazenda,
+          talhao: t.talhao, area_ha: t.areaHa, estagio: t.estagio,
+        });
+      }
+    }
+    if (excluidasAdmin) _logBase(`${excluidasAdmin} fazenda(s) administrativa(s) (prefixo ${CODFAZ_EXCLUIR_PREFIXO}) excluída(s).`);
+    if (semBase) _logBase(`<span style="color:var(--accent)">⚠ ${semBase} fazenda(s) do ICOL sem talhões na base de fazendas (ignoradas).</span>`);
+    _logBase(`${progRows.length} talhão(ões) para processar.`);
+    if (!progRows.length) { _logBase('<span style="color:var(--red)">Nada para enviar.</span>'); return; }
+
+    // ── Preserva STATUS/TIPO_LINHA/CICLO já preenchidos ──
+    _logBase('Lendo programação existente no Supabase...');
+    const existentes = await _sbFetchAll(`${SUPABASE_URL}/rest/v1/programacao?select=layer,status,tipo_linha,ciclo`);
+    const preserved = new Map(existentes.map(r => [String(r.layer), r]));
+
+    let novos = 0;
+    for (const row of progRows) {
+      const prev = preserved.get(String(row.layer));
+      if (prev) {
+        row.status = prev.status || '';
+        row.tipo_linha = prev.tipo_linha || '';
+        row.ciclo = prev.ciclo || '';
+      } else {
+        row.status = ''; row.tipo_linha = ''; row.ciclo = '';
+        novos++;
+      }
+    }
+
+    // ── Upsert em lotes ──
+    _logBase(`Enviando ${progRows.length} linha(s) (novas: ${novos}, preservadas: ${progRows.length - novos})...`);
+    const BATCH = 500;
+    for (let i = 0; i < progRows.length; i += BATCH) {
+      const chunk = progRows.slice(i, i + BATCH);
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/programacao`, {
+        method: 'POST',
+        headers: _sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+        body: JSON.stringify(chunk),
+      });
+      if (!res.ok) throw new Error(`upsert ${i}-${i + chunk.length}: ${res.status} ${await res.text()}`);
+      _logBase(`  ${Math.min(i + BATCH, progRows.length)}/${progRows.length}`);
+    }
+
+    // ── Avisa sobre LAYERs preenchidos que saíram da base ativa ──
+    const novosLayers = new Set(progRows.map(r => String(r.layer)));
+    const removidos = [...preserved.entries()].filter(([ly, v]) => !novosLayers.has(ly) && (v.status || v.tipo_linha || v.ciclo));
+    if (removidos.length) {
+      _logBase(`<span style="color:var(--accent)">⚠ ${removidos.length} LAYER(s) preenchido(s) não estão mais na base ativa (dados continuam no banco).</span>`);
+    }
+
+    _logBase('<span style="color:var(--green);font-weight:700">Atualização concluída!</span>');
+
+    await carregarDadosSupabase();
+    renderFazendas(currentNames);
+    renderPlano();
+    renderDashboard();
+  } catch (e) {
+    _logBase(`<span style="color:var(--red)">✗ ${e.message}</span>`);
+  }
+}
+
+// ── State ─────────────────────────────────────────────────────────────────
+let currentUser = (localStorage.getItem('gf_user') || '').toLowerCase();
+if (currentUser) localStorage.setItem('gf_user', currentUser);
+let exportado   = false;
+
+window.addEventListener('beforeunload', e => {
+  if (records.length > 0 && !exportado) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
+let currentFaz  = null;
+let cobertura   = 'inteira';
+let records     = [];
+let _arquivosEsperados = [];
+let _arquivosSelecionados = [];
+let _pendingReload = false;
+
+// Load today's records from localStorage
+const todayKey = 'gf_records_' + new Date().toISOString().slice(0,10);
+try { records = JSON.parse(localStorage.getItem(todayKey) || '[]'); } catch(e) { records = []; }
+
+// ── Init ──────────────────────────────────────────────────────────────────
+window.onload = async () => {
+  const loading = document.createElement('div');
+  loading.id = 'sbLoading';
+  loading.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:var(--bg,#0d1117);color:var(--muted,#888);font:13px sans-serif';
+  loading.textContent = 'Carregando dados...';
+  document.body.appendChild(loading);
+
+  await carregarDadosSupabase();
+  loading.remove();
+
+  populateMesFilter();
+  document.getElementById('sidebarTitle').textContent = `Fazendas (${FAZENDA_NAMES.length})`;
+  updateUserBadge();
+  if (currentUser) applyUserPermissions(currentUser);
+  renderLog();
+  updateExportBar(); updateStats();
+  checkPendentes();
+  renderPlano();
+  renderDashboard();
+  if (!currentUser) setTimeout(openUserModal, 400);
+  const lastFaz = sessionStorage.getItem('gf_lastFaz');
+  if (lastFaz && FAZENDAS[lastFaz]) selectFazenda(lastFaz);
+};
+
+// ── Registros pendentes de dias anteriores ────────────────────────────────
+function checkPendentes() {
+  const hoje = new Date().toISOString().slice(0, 10);
+  let pendente = null;
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key.startsWith('gf_records_')) continue;
+    const dia = key.replace('gf_records_', '');
+    if (dia === hoje) continue;
+    try {
+      const recs = JSON.parse(localStorage.getItem(key) || '[]');
+      if (recs.length > 0) { pendente = { key, dia, recs }; break; }
+    } catch(_) {}
+  }
+  if (!pendente) return;
+
+  const { key, dia, recs } = pendente;
+  const ha = totalHaRecords(recs);
+  const [ano, mes, d] = dia.split('-');
+  const diaFmt = `${d}/${mes}/${ano}`;
+  const banner = document.getElementById('bannerPendente');
+  banner.innerHTML = `<div class="banner-pendente">
+    <span>Você tem <strong>${recs.length} registros não exportados de ${diaFmt}</strong> (${ha.toFixed(1)} ha). Exportar antes de continuar?</span>
+    <div class="banner-actions">
+      <button class="btn-banner-export" onclick="exportarPendente('${key}','${diaFmt}')">Exportar agora</button>
+      <button class="btn-banner-discard" onclick="descartarPendente('${key}')">Descartar</button>
+    </div>
+  </div>`;
+  banner.style.display = 'block';
+}
+
+function exportarPendente(key, diaFmt) {
+  const recs = JSON.parse(localStorage.getItem(key) || '[]');
+  if (!recs.length) { descartarPendente(key); return; }
+  const usuario = recs[0]?.usuario || currentUser || 'usuario';
+  const dia = key.replace('gf_records_', '');
+  const wsData = [
+    ['TIMESTAMP','USUARIO','LAYER','COD_FAZ','FAZENDA','TALHAO','FRENTE','SEMANA','AREA_HA','TIPO_LINHA','CICLO','STATUS'],
+    ...recs.map(r => [
+      r.timestamp, r.usuario, r.layer, r.cod_faz,
+      r.fazenda, r.talhao, r.frente, r.semana,
+      r.ha || 0, r.tipo, r.ciclo, r.status
+    ])
+  ];
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols'] = [18,12,12,10,28,8,8,8,9,18,8,14].map(w => ({wch:w}));
+  XLSX.utils.book_append_sheet(wb, ws, 'Registros');
+  XLSX.writeFile(wb, `export_frentes_${usuario}_${dia}.xlsx`);
+  descartarPendente(key);
+  showToast(`${recs.length} registros de ${diaFmt} exportados.`);
+}
+
+function descartarPendente(key) {
+  localStorage.removeItem(key);
+  document.getElementById('bannerPendente').style.display = 'none';
+  checkPendentes();
+}
+
+// ── Mês atual ─────────────────────────────────────────────────────────────
+const _hoje = new Date();
+const _anoAtual = _hoje.getFullYear(), _mesAtual = _hoje.getMonth();
+function is18m(estagio) {
+  if (!estagio) return false;
+  const e = estagio.toUpperCase();
+  return e.includes('18') || e.includes('INVERNO') ||
+         e.includes('FORMA') || e === 'ANO';
+}
+
+// Converte período de colheita (1-12) → "YYYY-MM" (todos no ano atual)
+function semanaToYM(semana) {
+  if (!semana) return null;
+  const m = +semana;
+  if (!m || m < 1 || m > 12) return null;
+  return `${_anoAtual}-${String(m).padStart(2, '0')}`;
+}
+
+// Retorna "YYYY-MM" de um talhão — usa dia (data) se disponível, senão semana (período)
+function talYM(t) {
+  if (t.dia) return t.dia.slice(0, 7);
+  return semanaToYM(t.semana);
+}
+
+function isCurMonth(t) {
+  const ym = talYM(t);
+  if (!ym) return false;
+  const [y, m] = ym.split('-').map(Number);
+  return y === _anoAtual && m === _mesAtual + 1;
+}
+
+function isSelMonth(t) {
+  const ym = talYM(t);
+  if (!ym) return false;
+  const [y, m] = ym.split('-').map(Number);
+  const sel = document.getElementById('mesFilter');
+  if (!sel || !sel.value) return y === _anoAtual && m === _mesAtual + 1;
+  const [sy, sm] = sel.value.split('-').map(Number);
+  return y === sy && m === sm;
+}
+
+function populateMesFilter() {
+  const months = new Set();
+  const todayKey = `${_anoAtual}-${String(_mesAtual + 1).padStart(2, '0')}`;
+  Object.values(FAZENDAS).forEach(faz =>
+    Object.values(faz.talhoes).forEach(t => {
+      const ym = talYM(t);
+      if (ym) months.add(ym);
+    })
+  );
+  const sorted = [...months].sort();
+  const sel = document.getElementById('mesFilter');
+  sel.innerHTML = sorted.map(ym => {
+    const [y, m] = ym.split('-');
+    const label = new Date(+y, +m - 1).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })
+      .replace(/\./g, '').toUpperCase();
+    return `<option value="${ym}"${ym === todayKey ? ' selected' : ''}>${label}</option>`;
+  }).join('');
+}
+
+function onMesFilterChange() {
+  filterFazendas(document.getElementById('searchFaz').value);
+}
+
+// ── Fazenda dropdown ──────────────────────────────────────────────────────
+function renderFazendas(names) {
+  const registered = new Set(records.map(r => r.fazenda));
+  document.getElementById('fazendaList').innerHTML = names.length
+    ? names.map(name => {
+        const d = FAZENDAS[name];
+        const nTal = Object.keys(d.talhoes).length;
+        const done = registered.has(name);
+        const nMes = Object.values(d.talhoes).filter(t => isSelMonth(t)).length;
+        const { status, cls, ciclo } = getFazStatus(name);
+        return `<div class="fazenda-item${done ? ' registered' : ''}${name === currentFaz ? ' active' : ''}${nMes > 0 ? ' has-mes-atual' : ''}"
+                     data-name="${name.replace(/"/g,'&quot;')}"
+                     onmousedown="selectFazenda('${name.replace(/'/g,"\\'")}')">
+          <div style="flex:1;min-width:0">
+            <div class="fazenda-name">${name}${done ? ' <span class="reg-dot">&#10003;</span>' : ''}</div>
+            <div class="fazenda-meta" style="display:flex;gap:4px;margin-top:3px;flex-wrap:wrap">
+              <span class="faz-tag faz-tag-${cls}">${status}</span>
+              <span class="faz-tag faz-tag-muted">${ciclo}</span>
+              ${nMes > 0 ? `<span style="font-size:9px;color:var(--green);font-weight:700">● mês</span>` : ''}
+            </div>
+          </div>
+          <div class="fazenda-count">${nTal} tal.</div>
+        </div>`;
+      }).join('')
+    : '<div style="padding:12px 14px;color:var(--muted);font-size:13px">Nenhuma fazenda encontrada</div>';
+}
+
+function openFazDropdown() {
+  filterFazendas(document.getElementById('searchFaz').value);
+  document.getElementById('fazDropdown').classList.add('open');
+}
+
+function closeFazDropdown() {
+  document.getElementById('fazDropdown').classList.remove('open');
+  if (currentFaz) document.getElementById('searchFaz').value = '';
+}
+
+// ── Keyboard navigation in fazenda dropdown ───────────────────────────────
+let _dropIdx = -1;
+function _dropItems() { return [...document.querySelectorAll('#fazendaList .fazenda-item')]; }
+function _dropHighlight(idx) {
+  const items = _dropItems();
+  items.forEach(el => el.classList.remove('kb-focus'));
+  _dropIdx = Math.max(-1, Math.min(idx, items.length - 1));
+  if (_dropIdx >= 0) {
+    items[_dropIdx].classList.add('kb-focus');
+    items[_dropIdx].scrollIntoView({ block: 'nearest' });
+  }
+}
+function onFazSearchKey(e) {
+  const isOpen = document.getElementById('fazDropdown').classList.contains('open');
+  if (e.key === 'Escape') { closeFazDropdown(); return; }
+  if (!isOpen) { if (e.key === 'ArrowDown') { openFazDropdown(); return; } return; }
+  if (e.key === 'ArrowDown')  { e.preventDefault(); _dropHighlight(_dropIdx + 1); return; }
+  if (e.key === 'ArrowUp')    { e.preventDefault(); _dropHighlight(_dropIdx - 1); return; }
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const items = _dropItems();
+    const target = _dropIdx >= 0 ? items[_dropIdx] : items.length === 1 ? items[0] : null;
+    if (target?.dataset.name) selectFazenda(target.dataset.name);
+  }
+}
+
+// ── Context Menu ──────────────────────────────────────────────────────────
+let _ctxFaz = null;
+function openCtxMenu(e, name) {
+  e.preventDefault();
+  _ctxFaz = name;
+  const inPlan = planFazendas.includes(name);
+  const item = document.getElementById('ctxAddPlanItem');
+  if (inPlan) {
+    item.innerHTML = '&#10003; Já na lista de tarefas';
+    item.classList.add('already');
+  } else {
+    item.innerHTML = '&#43;&nbsp; Adicionar à lista de tarefas';
+    item.classList.remove('already');
+  }
+  const menu = document.getElementById('ctxMenu');
+  menu.style.left = Math.min(e.clientX, window.innerWidth  - 220) + 'px';
+  menu.style.top  = Math.min(e.clientY, window.innerHeight -  56) + 'px';
+  menu.classList.add('open');
+}
+function closeCtxMenu() {
+  document.getElementById('ctxMenu').classList.remove('open');
+  _ctxFaz = null;
+}
+function ctxAddToPlan() {
+  if (!_ctxFaz || planFazendas.includes(_ctxFaz)) { closeCtxMenu(); return; }
+  addToPlano(_ctxFaz);
+  showToast(`"${_ctxFaz}" adicionada à lista.`);
+  closeCtxMenu();
+}
+document.addEventListener('click',   e => { if (!document.getElementById('ctxMenu').contains(e.target)) closeCtxMenu(); });
+document.addEventListener('scroll',  () => closeCtxMenu(), true);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeCtxMenu(); closePlanCtxMenu(); } });
+document.addEventListener('click',   e => { if (!document.getElementById('planCtxMenu').contains(e.target)) closePlanCtxMenu(); });
+document.addEventListener('scroll',  () => closePlanCtxMenu(), true);
+
+const _filterMap = {
+  a_fazer:  ['filterAFazer', 'active-blue'],
+  mes_atual:['filterMes',    'active-green'],
+  '18m':    ['filter18m',    'active-red'],
+};
+
+function setFazFilter(type) {
+  if (activeFilters.has(type)) activeFilters.delete(type);
+  else activeFilters.add(type);
+  Object.values(_filterMap).forEach(([id, cls]) =>
+    document.getElementById(id)?.classList.remove('active-blue','active-accent','active-green','active-red'));
+  activeFilters.forEach(f => {
+    if (_filterMap[f]) document.getElementById(_filterMap[f][0])?.classList.add(_filterMap[f][1]);
+  });
+  document.getElementById('mesFilter')?.classList.toggle('active', activeFilters.has('mes_atual'));
+  filterFazendas(document.getElementById('searchFaz').value);
+}
+
+function filterFazendas(q) {
+  const ql = q.toLowerCase();
+  let names = q
+    ? FAZENDA_NAMES.filter(n => {
+        const d = FAZENDAS[n];
+        return n.toLowerCase().includes(ql) || String(d.cod).includes(q);
+      })
+    : [...FAZENDA_NAMES];
+
+  if (activeFilters.has('a_fazer'))   names = names.filter(n => getFazStatus(n).status === 'A FAZER');
+  if (activeFilters.has('mes_atual')) names = names.filter(n => Object.values(FAZENDAS[n].talhoes).some(t => isSelMonth(t)));
+  if (activeFilters.has('18m'))       names = names.filter(n => Object.values(FAZENDAS[n].talhoes).some(t => is18m(t.estagio)));
+
+  currentNames = names;
+  renderFazendas(currentNames);
+  document.getElementById('sidebarTitle').textContent =
+    `Fazendas (${currentNames.length}${currentNames.length < FAZENDA_NAMES.length ? '/' + FAZENDA_NAMES.length : ''})`;
+}
+
+function selectFazenda(name) {
+  currentFaz = name;
+  sessionStorage.setItem('gf_lastFaz', name);
+  cobertura = 'inteira';
+  document.getElementById('fazDropdown').classList.remove('open');
+  document.getElementById('searchFaz').value = '';
+
+  const badge = document.getElementById('fazSelectedBadge');
+  badge.textContent = name;
+  badge.style.display = 'block';
+
+  document.getElementById('placeholder').style.display = 'none';
+  document.getElementById('formArea').style.display = 'block';
+
+  const d = FAZENDAS[name];
+  document.getElementById('formFazTitle').textContent = name;
+  const frentes = [...new Set(Object.values(d.talhoes).map(t => t.frente).filter(Boolean))].sort((a,b)=>a-b);
+  document.getElementById('formFrenteTag').textContent = frentes.length ? 'Frente ' + frentes.join(', ') : '—';
+  document.getElementById('formCodTag').textContent = 'COD ' + d.cod;
+
+  setCobertura('inteira');
+  renderTalhoes();
+  updateSubmitBtn();
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.faz-selector')) {
+    document.getElementById('fazDropdown').classList.remove('open');
+  }
+});
+
+// ── Talhões ───────────────────────────────────────────────────────────────
+function renderTalhoes() {
+  const grid = document.getElementById('talhoesGrid');
+  if (!currentFaz) return;
+  const tals = Object.keys(FAZENDAS[currentFaz].talhoes).sort((a,b) => +a - +b);
+
+  grid.innerHTML = tals.map(t => {
+    const td = FAZENDAS[currentFaz].talhoes[t];
+    const badge18 = is18m(td.estagio)
+      ? '<span class="tal-chip-18m">18m</span>' : '';
+    return `<div class="tal-chip ${cobertura==='inteira'?'selected disabled':''}"
+                 data-tal="${t}" onclick="toggleTal(this)">${t}${badge18}</div>`;
+  }).join('');
+
+  updateTalCount();
+}
+
+function toggleTal(el) {
+  if (cobertura !== 'parcial') return;
+  el.classList.toggle('selected');
+  updateTalCount();
+  updateSubmitBtn();
+}
+
+function select18mTal() {
+  document.querySelectorAll('.tal-chip').forEach(c => {
+    if (c.querySelector('.tal-chip-18m')) c.classList.add('selected');
+  });
+  updateTalCount(); updateSubmitBtn();
+}
+
+function selectAllTal() {
+  document.querySelectorAll('.tal-chip').forEach(c => c.classList.add('selected'));
+  updateTalCount(); updateSubmitBtn();
+}
+
+function clearAllTal() {
+  document.querySelectorAll('.tal-chip').forEach(c => c.classList.remove('selected'));
+  updateTalCount(); updateSubmitBtn();
+}
+
+function selectRestantesTal() {
+  const registrados = new Set(
+    records.filter(r => r.fazenda === currentFaz).map(r => r.talhao)
+  );
+  document.querySelectorAll('.tal-chip').forEach(c => {
+    c.classList.toggle('selected', !registrados.has(+c.dataset.tal));
+  });
+  updateTalCount(); updateSubmitBtn();
+}
+
+function updateTalCount() {
+  const total = document.querySelectorAll('.tal-chip').length;
+  const sel   = cobertura === 'inteira' ? total : document.querySelectorAll('.tal-chip.selected').length;
+  const el    = document.getElementById('talSel');
+  el.textContent = sel > 0 ? `(${sel}/${total})` : `(0/${total})`;
+}
+
+function getSelectedTals() {
+  if (cobertura === 'inteira') {
+    if (!currentFaz || !FAZENDAS[currentFaz]) return [];
+    return Object.keys(FAZENDAS[currentFaz].talhoes).map(Number).sort((a,b)=>a-b);
+  }
+  return [...document.querySelectorAll('.tal-chip.selected')].map(c => +c.dataset.tal);
+}
+
+// ── Cobertura ─────────────────────────────────────────────────────────────
+function setCobertura(tipo) {
+  cobertura = tipo;
+  document.getElementById('btnInteira').classList.toggle('active', tipo==='inteira');
+  document.getElementById('btnParcial').classList.toggle('active', tipo==='parcial');
+  document.getElementById('talActions').style.display = tipo==='parcial' ? 'flex' : 'none';
+
+  document.querySelectorAll('.tal-chip').forEach(c => {
+    c.classList.toggle('selected', tipo==='inteira');
+    c.classList.toggle('disabled',  tipo==='inteira');
+  });
+  updateTalCount(); updateSubmitBtn();
+}
+
+// ── Submit ────────────────────────────────────────────────────────────────
+function updateSubmitBtn() {
+  const tipo   = document.getElementById('selTipo').value;
+  const ciclo  = document.getElementById('selCiclo').value;
+  const status = document.getElementById('selStatus').value;
+  const tals   = getSelectedTals();
+  const isSemLinhas = tipo === 'SEM LINHAS';
+  const ok = currentUser && currentFaz && tipo && (ciclo || isSemLinhas) && status && tals.length > 0;
+
+  document.getElementById('btnSubmit').disabled = !ok;
+
+  const info = document.getElementById('submitInfo');
+  if (!currentUser)   info.textContent = '⚠ selecione seu usuário';
+  else if (!tipo)     info.textContent = 'selecione o tipo de linha';
+  else if (!ciclo)    info.textContent = 'selecione o ciclo';
+  else if (!status)   info.textContent = 'selecione o status';
+  else if (!tals.length) info.textContent = 'selecione ao menos um talhão';
+  else {
+    const totalHa = tals.reduce((sum, t) => {
+      const td = FAZENDAS[currentFaz]?.talhoes[String(t)];
+      return sum + (td?.ha || 0);
+    }, 0);
+    info.textContent = `${tals.length} talhão(ões) — ${totalHa.toFixed(1)} ha`;
+  }
+}
+
+document.getElementById('selTipo').onchange = function() {
+  const isSemLinhas = this.value === 'SEM LINHAS';
+  const selStatus = document.getElementById('selStatus');
+  const selCiclo  = document.getElementById('selCiclo');
+  if (isSemLinhas) {
+    selStatus.value    = 'SEM LINHAS';
+    selStatus.disabled = true;
+    selCiclo.value     = '';
+    selCiclo.disabled  = true;
+  } else {
+    selStatus.disabled = false;
+    selCiclo.disabled  = false;
+  }
+  updateSubmitBtn();
+};
+document.getElementById('selCiclo').onchange  = updateSubmitBtn;
+document.getElementById('selStatus').onchange = updateSubmitBtn;
+
+function registrar() {
+  const fazData = FAZENDAS[currentFaz];
+  const tipo   = document.getElementById('selTipo').value;
+  const ciclo  = document.getElementById('selCiclo').value;
+  const status = document.getElementById('selStatus').value;
+  const tals   = getSelectedTals();
+  const now    = new Date();
+  const ts     = now.toLocaleString('pt-BR');
+
+  tals.forEach(tal => {
+    const td = fazData.talhoes[String(tal)];
+    records.push({
+      timestamp: ts,
+      usuario:   currentUser,
+      layer:     td?.layer || (fazData.cod * 1000 + tal),
+      fazenda:   currentFaz,
+      cod_faz:   fazData.cod,
+      talhao:    tal,
+      frente:    td?.frente || '—',
+      semana:    td?.semana || '—',
+      ha:        td?.ha || 0,
+      tipo,
+      ciclo,
+      status
+    });
+  });
+
+  localStorage.setItem(todayKey, JSON.stringify(records));
+  showToast(`${tals.length} talhão(ões) registrados`);
+  renderLog();
+  updateExportBar(); updateStats();
+  renderFazendas(currentNames);
+  renderPlano();
+  if (document.getElementById('viewDashboard').style.display !== 'none') renderDashboard();
+
+  // Reset form fields
+  document.getElementById('selTipo').value    = '';
+  document.getElementById('selCiclo').value   = '';
+  document.getElementById('selStatus').value  = '';
+  document.getElementById('selCiclo').disabled  = false;
+  document.getElementById('selStatus').disabled = false;
+  setCobertura('inteira');
+  updateSubmitBtn();
+}
+
+// ── Log ───────────────────────────────────────────────────────────────────
+function renderLog() {
+  const sec = document.getElementById('logSection');
+  const content = document.getElementById('logContent');
+
+  if (records.length === 0) {
+    sec.classList.remove('visible');
+    content.innerHTML = '<div class="no-records">nenhum registro ainda</div>';
+    return;
+  }
+  sec.classList.add('visible');
+
+  // Group by timestamp+fazenda for cleaner display
+  const rows = [...records].reverse().map((r, i) => {
+    const idx = records.length - 1 - i;
+    return `<tr>
+      <td>${r.timestamp}</td>
+      <td>${r.usuario}</td>
+      <td><strong>${r.fazenda}</strong></td>
+      <td style="font-family:monospace">${r.talhao}</td>
+      <td style="font-family:monospace">${r.layer}</td>
+      <td style="font-family:monospace">${(r.ha||0).toFixed(1)} ha</td>
+      <td>${r.tipo}</td>
+      <td>${r.ciclo}</td>
+      <td><span class="status-pill status-${r.status}">${r.status}</span></td>
+      <td style="white-space:nowrap">
+        <button class="btn-edit" data-idx="${idx}" onclick="openEditModal(+this.dataset.idx)" title="editar">✎</button>
+        <button class="btn-del"  data-idx="${idx}" onclick="delRecord(+this.dataset.idx)"  title="remover">✕</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  content.innerHTML = `<table>
+    <thead><tr>
+      <th>Horário</th><th>Usuário</th><th>Fazenda</th><th>Talhão</th>
+      <th>Layer</th><th>Área</th><th>Tipo</th><th>Ciclo</th><th>Status</th><th></th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function delRecord(idx) {
+  if (!confirm('Remover este registro?')) return;
+  records.splice(idx, 1);
+  localStorage.setItem(todayKey, JSON.stringify(records));
+  renderLog();
+  updateExportBar(); updateStats();
+}
+
+function scrollToLog() {
+  document.getElementById('logSection').scrollIntoView({behavior:'smooth'});
+}
+
+// ── Stats cards ──────────────────────────────────────────────────────────
+function updateStats() {
+  const registered = new Set(records.map(r => r.fazenda));
+  const regFaz  = registered.size;
+  const regTal  = records.length;
+  const ha      = totalHaRecords(records);
+
+  if (planFazendas.length > 0) {
+    // Modo plano: progresso relativo à lista do dia
+    const planTotal = planFazendas.length;
+    const planDone  = planFazendas.filter(f => registered.has(f) || planFazendasDone.has(f)).length;
+    const planTal   = planFazendas.reduce((s, f) => s + Object.keys(FAZENDAS[f]?.talhoes || {}).length, 0);
+    const planHaTotal = planFazendas.reduce((s, f) =>
+      s + Object.values(FAZENDAS[f]?.talhoes || {}).reduce((a, t) => a + (t.ha || 0), 0), 0);
+    const pct = planTotal > 0 ? Math.round(planDone / planTotal * 100) : 0;
+
+    document.getElementById('statFazendas').textContent  = planTotal;
+    document.getElementById('statTalhoes').textContent   = `${planTal} talhões — ${planHaTotal.toFixed(0)} ha`;
+    document.getElementById('statRegFazendas').textContent = regFaz;
+    document.getElementById('statRegTalhoes').textContent  = `${regTal} talhões`;
+    document.getElementById('statHa').textContent        = ha.toLocaleString('pt-BR', {minimumFractionDigits:1, maximumFractionDigits:1});
+    document.getElementById('statPct').textContent       = pct + '%';
+    document.getElementById('statProgSub').textContent   = `${planDone} de ${planTotal} no plano`;
+    document.getElementById('statLabel1').textContent    = 'Plano da Semana';
+  } else {
+    // Sem plano: exibe totais da base
+    const totalFaz = FAZENDA_NAMES.length;
+    const totalTal = FAZENDA_NAMES.reduce((s, n) => s + Object.keys(FAZENDAS[n].talhoes).length, 0);
+    const conclFaz = FAZENDA_NAMES.filter(n => {
+      const tals = Object.values(FAZENDAS[n].talhoes);
+      return tals.length > 0 && tals.every(t => t.exp === 'CONCLUIDO' || t.exp === 'SEM LINHAS');
+    }).length;
+    const pct = totalFaz > 0 ? Math.round(conclFaz / totalFaz * 100) : 0;
+
+    document.getElementById('statFazendas').textContent  = totalFaz.toLocaleString('pt-BR');
+    document.getElementById('statTalhoes').textContent   = `${totalTal.toLocaleString('pt-BR')} talhões`;
+    document.getElementById('statRegFazendas').textContent = regFaz;
+    document.getElementById('statRegTalhoes').textContent  = `${regTal} talhões`;
+    document.getElementById('statHa').textContent        = ha.toLocaleString('pt-BR', {minimumFractionDigits:1, maximumFractionDigits:1});
+    document.getElementById('statPct').textContent       = pct + '%';
+    document.getElementById('statProgSub').textContent   = `${conclFaz} de ${totalFaz} concluídas`;
+    document.getElementById('statLabel1').textContent    = 'Base ICOL';
+  }
+}
+
+function totalHaRecords(recs) {
+  return recs.reduce((s, r) => s + (r.ha || 0), 0);
+}
+
+function updateExportBar() {
+  const n  = records.length;
+  const ha = totalHaRecords(records);
+  document.getElementById('exportInfo').textContent =
+    n > 0 ? `${n} registro(s) — ${ha.toFixed(1)} ha` : '0 registros';
+  document.getElementById('btnExport').disabled = n === 0;
+  document.getElementById('btnClear').style.display = n > 0 ? 'inline-block' : 'none';
+}
+
+function _exportarXLSX() {
+  if (!records.length || !currentUser) return;
+  const hoje = new Date().toISOString().slice(0,10);
+  const wsData = [
+    ['TIMESTAMP','USUARIO','LAYER','COD_FAZ','FAZENDA','TALHAO','FRENTE','SEMANA','AREA_HA','TIPO_LINHA','CICLO','STATUS'],
+    ...records.map(r => [
+      r.timestamp, r.usuario, r.layer, r.cod_faz,
+      r.fazenda, r.talhao, r.frente, r.semana,
+      r.ha || 0, r.tipo, r.ciclo, r.status
+    ])
+  ];
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols'] = [18,12,12,10,28,8,8,8,9,18,8,14].map(w => ({wch:w}));
+  XLSX.utils.book_append_sheet(wb, ws, 'Registros');
+  XLSX.writeFile(wb, `export_frentes_${currentUser}_${hoje}.xlsx`);
+  showToast(`${records.length} registros baixados — mova para exports/ e rode CONSOLIDAR.bat`);
+}
+
+function exportar() { _exportarXLSX(); exportado = true; updateExportBar(); updateStats(); }
+
+// ── Consolidar direto no Supabase ─────────────────────────────────────────
+function _abrirConsolidarModal(titulo, html, mostrarFallback) {
+  document.getElementById('consolidarTitle').textContent = titulo;
+  document.getElementById('consolidarBody').innerHTML   = html;
+  document.getElementById('consolidarActions').style.display = '';
+  document.getElementById('btnConsolidarFallback').style.display = mostrarFallback ? '' : 'none';
+  document.getElementById('btnFecharConsolidar').disabled = false;
+  const el = document.getElementById('consolidarOverlay');
+  el.style.display = '';
+  el.classList.add('open');
+}
+
+function fecharConsolidar() {
+  const el = document.getElementById('consolidarOverlay');
+  el.classList.remove('open');
+  el.style.display = 'none';
+  if (_pendingReload) { _pendingReload = false; location.reload(); }
+}
+
+function _baixarFallback() {
+  exportar();
+  document.getElementById('btnConsolidarLimpar').style.display = '';
+}
+
+function _limparFallback() {
+  if (!confirm(`Limpar os ${records.length} registros do dia? Faça isso apenas após o CONSOLIDAR.bat ter sido executado com sucesso.`)) return;
+  records = [];
+  exportado = false;
+  localStorage.setItem(todayKey, JSON.stringify(records));
+  renderLog(); updateExportBar(); updateStats();
+  renderFazendas(currentNames);
+  renderPlano();
+  fecharConsolidar();
+  _pendingReload = true;
+  location.reload();
+}
+
+function _setConsolidarStatus(msg) {
+  document.getElementById('consolidarBody').innerHTML =
+    `<div style="color:var(--muted);font-size:13px">${msg}</div>`;
+}
+
+
+function _parseTimestampPtBr(s) {
+  const m = String(s).match(/(\d{2})\/(\d{2})\/(\d{4}),?\s*(\d{2}):(\d{2}):(\d{2})/);
+  if (!m) return new Date().toISOString();
+  const [, d, mo, y, h, mi, se] = m;
+  return new Date(`${y}-${mo}-${d}T${h}:${mi}:${se}`).toISOString();
+}
+
+async function consolidar() {
+  if (records.length === 0) return;
+  if (!currentUser) { openUserModal(); return; }
+
+  // Abre modal aguardando
+  document.getElementById('consolidarTitle').textContent = 'Consolidando...';
+  document.getElementById('consolidarBody').innerHTML =
+    '<div style="color:var(--muted);font-size:13px">Aguarde...</div>';
+  document.getElementById('consolidarActions').style.display = 'none';
+  const el = document.getElementById('consolidarOverlay');
+  el.style.display = '';
+  el.classList.add('open');
+
+  try {
+    // Mantém apenas o último registro de cada talhão
+    const porLayer = new Map();
+    for (const r of records) porLayer.set(r.layer, r);
+    const recsUnicos = [...porLayer.values()];
+
+    // ── 1. Atualiza a tabela programacao ──────────────────────────────
+    _setConsolidarStatus('Atualizando programação...');
+    const agora = new Date().toISOString();
+    await Promise.all(recsUnicos.map(async r => {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/programacao?layer=eq.${r.layer}`, {
+        method: 'PATCH',
+        headers: _sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
+        body: JSON.stringify({ status: r.status, tipo_linha: r.tipo, ciclo: r.ciclo, updated_at: agora }),
+      });
+      if (!res.ok) throw new Error(`programacao (layer ${r.layer}): ${res.status} ${await res.text()}`);
+    }));
+
+    // ── 2. Insere no log de exportações ───────────────────────────────
+    _setConsolidarStatus('Registrando histórico...');
+    const logRows = recsUnicos.map(r => ({
+      data_consolidacao: agora,
+      registrado_em: _parseTimestampPtBr(r.timestamp),
+      usuario: r.usuario, layer: r.layer, fazenda: r.fazenda, talhao: r.talhao,
+      tipo_linha: r.tipo, ciclo: r.ciclo, status: r.status,
+    }));
+    const logRes = await fetch(`${SUPABASE_URL}/rest/v1/log_exportacoes`, {
+      method: 'POST',
+      headers: _sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
+      body: JSON.stringify(logRows),
+    });
+    if (!logRes.ok) throw new Error(`log_exportacoes: ${logRes.status} ${await logRes.text()}`);
+
+    // ── 3. Atualiza ha acumulado do usuário ───────────────────────────
+    _setConsolidarStatus('Atualizando estatísticas do usuário...');
+    const haDelta = recsUnicos.reduce((s, r) => s + (r.ha || 0), 0);
+    const userRes = await fetch(`${SUPABASE_URL}/rest/v1/usuarios?nome=eq.${encodeURIComponent(currentUser)}&select=ha`,
+      { headers: _sbHeaders() });
+    const userRows = userRes.ok ? await userRes.json() : [];
+    const haAtual  = userRows[0]?.ha || 0;
+    const haNovo   = Math.round((haAtual + haDelta) * 100) / 100;
+    await fetch(`${SUPABASE_URL}/rest/v1/usuarios?nome=eq.${encodeURIComponent(currentUser)}`, {
+      method: 'PATCH',
+      headers: _sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
+      body: JSON.stringify({ ha: haNovo }),
+    });
+    USUARIOS_HA[currentUser] = haNovo;
+
+    // ── 4. Atualiza dados locais (sem precisar recarregar) ────────────
+    for (const r of recsUnicos) {
+      const td = FAZENDAS[r.fazenda]?.talhoes?.[String(r.talhao)];
+      if (td) { td.exp = r.status; td.tipo = r.tipo; td.ciclo = r.ciclo; }
+    }
+
+    const ha = totalHaRecords(records).toFixed(1);
+
+    // Monta a lista de arquivos obrigatórios: 4 por fazenda (Exp1L/Exp2L × dwg/zip)
+    const fazendasUnicas = [...new Set(recsUnicos.map(r => r.fazenda))];
+    _arquivosEsperados = [];
+    _arquivosSelecionados = [];
+    for (const faz of fazendasUnicas) {
+      const cod = String(FAZENDAS[faz]?.cod ?? '');
+        for (const {suf, ext} of [{suf:'Rev0',ext:'dwg'},{suf:'Exp0',ext:'zip'},{suf:'Rev0',ext:'pdf'}]) {
+          _arquivosEsperados.push({ cod, faz, suf, ext, nome: `${cod}_*_${suf}.${ext}`, ok: false, matched: null });
+        }
+    }
+
+    _abrirConsolidarModal('Consolidado com sucesso!', `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <div style="background:var(--surface2);border-radius:8px;padding:10px;text-align:center">
+          <div style="font-size:22px;font-weight:700;color:var(--green)">${recsUnicos.length}</div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Registros</div>
+        </div>
+        <div style="background:var(--surface2);border-radius:8px;padding:10px;text-align:center">
+          <div style="font-size:22px;font-weight:700;color:var(--accent)">${ha} ha</div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Área total</div>
+        </div>
+      </div>
+      <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+        <div style="font-size:12px;font-weight:700;margin-bottom:6px">Arquivos de projeto obrigatórios (.dwg/.zip/.pdf)</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
+          Selecione os ${_arquivosEsperados.length} arquivo(s) correspondentes aos itens abaixo (pode selecionar vários de uma vez), para liberar o envio e fechar.
+          O nome deve seguir o padrão <code>{COD_FAZ}_{NOME}_{Exp1L|Exp2L}.{dwg|zip}</code> (separado por "_") —
+          o nome da fazenda no meio pode variar, o sistema identifica pelo código e pelo sufixo.
+        </div>
+        <ul id="checklistArquivos" style="list-style:none;padding:0;margin:0 0 8px;font-size:11px;line-height:1.9">
+          ${_arquivosEsperados.map(a => `<li data-nome="${a.nome}">⬜ ${a.nome}</li>`).join('')}
+        </ul>
+        <input type="file" id="inputArquivosProjeto" accept=".dwg,.zip,.pdf" multiple onchange="_adicionarArquivoProjeto(this)">
+        <button class="btn-modal-cancel" style="margin-left:8px" id="btnEnviarArquivos" onclick="enviarArquivosProjeto()" disabled>Enviar arquivos</button>
+        <div id="uploadArquivosLog" style="margin-top:8px;font-size:11px;line-height:1.8"></div>
+      </div>`, false);
+    document.getElementById('btnFecharConsolidar').disabled = true;
+
+    records = [];
+    exportado = true;
+    _pendingReload = true;
+    localStorage.removeItem(todayKey);
+    renderLog(); updateExportBar(); updateStats();
+    renderFazendas(currentNames);
+    renderPlano(); renderDashboard();
+
+  } catch (e) {
+    _abrirConsolidarModal('Erro na consolidação',
+      `<p style="color:var(--red);font-size:13px;margin-bottom:10px">${e.message}</p>
+       <p style="font-size:12px;color:var(--muted)">Você pode baixar o XLSX como backup e tentar novamente mais tarde.</p>`,
+      true);
+  }
+}
+
+
+// ── Upload de arquivos de projeto (.dwg/.zip) para Releases do GitHub ─────
+// Via proxy (Cloudflare Worker) — ver RELEASE_PROXY_URL e cloudflare-worker/release-proxy.js.
+async function _releaseUploadAsset(tag, name, file) {
+  const url = `${RELEASE_PROXY_URL}/upload?tag=${encodeURIComponent(tag)}&name=${encodeURIComponent(name)}&filename=${encodeURIComponent(file.name)}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': file.type || 'application/octet-stream' },
+    body: file,
+  });
+  if (!res.ok) throw new Error(`upload ${file.name}: ${res.status} ${await res.text()}`);
+  return res.json();
+}
+
+function _logArquivos(msg) {
+  const el = document.getElementById('uploadArquivosLog');
+  if (el) el.insertAdjacentHTML('beforeend', `<div>${msg}</div>`);
+}
+
+function _adicionarArquivoProjeto(input) {
+  const files = [...input.files];
+  input.value = '';
+  if (!files.length) return;
+
+  for (const file of files) {
+    const m = file.name.match(RE_ARQ_PROJETO);
+    const item = m && _arquivosEsperados.find(a =>
+      a.cod === m[1] && a.suf.toLowerCase() === m[2].toLowerCase() && a.ext.toLowerCase() === m[3].toLowerCase());
+
+    if (!item) {
+      _logArquivos(`<span style="color:var(--red)">Arquivo fora do padrão esperado (ignorado): ${file.name}</span>`);
+      continue;
+    }
+
+    // Substitui o arquivo anterior do mesmo item, se houver
+    _arquivosSelecionados = _arquivosSelecionados.filter(f => {
+      const mm = f.name.match(RE_ARQ_PROJETO);
+      return !(mm[1] === item.cod && mm[2].toLowerCase() === item.suf.toLowerCase() && mm[3].toLowerCase() === item.ext.toLowerCase());
+    });
+    _arquivosSelecionados.push(file);
+  }
+  _validarArquivosProjeto();
+}
+
+function _validarArquivosProjeto() {
+  let todosOk = true;
+  for (const item of _arquivosEsperados) {
+    const match = _arquivosSelecionados.find(f => {
+      const m = f.name.match(RE_ARQ_PROJETO);
+      return m && m[1] === item.cod && m[2].toLowerCase() === item.suf.toLowerCase() && m[3].toLowerCase() === item.ext.toLowerCase();
+    });
+    item.ok = !!match;
+    item.matched = match ? match.name : null;
+    if (!item.ok) todosOk = false;
+  }
+  document.querySelectorAll('#checklistArquivos li').forEach(li => {
+    const item = _arquivosEsperados.find(a => a.nome === li.dataset.nome);
+    li.innerHTML = `${item.ok ? '✅' : '⬜'} ${item.nome}` +
+      (item.matched ? ` <span style="color:var(--muted)">→ ${item.matched}</span>` : '');
+    li.style.color = item.ok ? 'var(--green)' : '';
+  });
+
+  document.getElementById('btnEnviarArquivos').disabled = !todosOk;
+}
+
+async function enviarArquivosProjeto() {
+  const files = _arquivosSelecionados;
+  const log = document.getElementById('uploadArquivosLog');
+  if (log) log.innerHTML = '';
+
+  const btn = document.getElementById('btnEnviarArquivos');
+  btn.disabled = true;
+
+  // Agrupa arquivos por codFaz → release (um release por fazenda, com todas as frentes)
+  const grupos = {};
+  for (const file of files) {
+    const m = file.name.match(RE_ARQ_PROJETO);
+    if (!m) continue;
+    const [, codFaz] = m;
+    const tag = codFaz;
+    const name = codFaz;
+    (grupos[tag] ||= { name, files: [] }).files.push(file);
+  }
+
+  let erro = false;
+  for (const [tag, grupo] of Object.entries(grupos)) {
+    try {
+      for (const file of grupo.files) {
+        _logArquivos(`Enviando ${file.name}...`);
+        await _releaseUploadAsset(tag, grupo.name, file);
+        _logArquivos(`<span style="color:var(--green)">✓ ${file.name} enviado</span>`);
+      }
+    } catch (e) {
+      erro = true;
+      _logArquivos(`<span style="color:var(--red)">✗ ${tag}: ${e.message}</span>`);
+    }
+  }
+
+  if (!erro) {
+    _logArquivos('<span style="color:var(--green);font-weight:700">Todos os arquivos enviados com sucesso!</span>');
+    document.getElementById('btnFecharConsolidar').disabled = false;
+  } else {
+    btn.disabled = false;
+  }
+}
+
+function openClearConfirm() {
+  const n  = records.length;
+  const ha = totalHaRecords(records);
+  document.getElementById('clearConfirmMsg').textContent =
+    `Apagar ${n} registro(s) de hoje (${ha.toFixed(1)} ha)?`;
+  document.getElementById('clearConfirmOverlay').classList.add('open');
+}
+function closeClearConfirm() {
+  document.getElementById('clearConfirmOverlay').classList.remove('open');
+}
+function confirmLimpar() {
+  closeClearConfirm();
+  records = [];
+  exportado = false;
+  localStorage.setItem(todayKey, JSON.stringify(records));
+  renderLog();
+  updateExportBar(); updateStats();
+  renderFazendas(currentNames);
+  renderPlano();
+  showToast('Registros limpos.');
+}
+
+function limparRegistros() {
+  openClearConfirm();
+}
+
+// ── Edit modal ────────────────────────────────────────────────────────────
+let editIdx = -1;
+function openEditModal(idx) {
+  editIdx = idx;
+  const r = records[idx];
+  document.getElementById('editTipo').value   = r.tipo;
+  document.getElementById('editCiclo').value  = r.ciclo;
+  document.getElementById('editStatus').value = r.status;
+  document.getElementById('editOverlay').classList.add('open');
+}
+function closeEditModal() {
+  document.getElementById('editOverlay').classList.remove('open');
+}
+function saveEdit() {
+  if (editIdx < 0) return;
+  records[editIdx].tipo   = document.getElementById('editTipo').value;
+  records[editIdx].ciclo  = document.getElementById('editCiclo').value;
+  records[editIdx].status = document.getElementById('editStatus').value;
+  localStorage.setItem(todayKey, JSON.stringify(records));
+  closeEditModal();
+  renderLog();
+  exportado = false;
+}
+
+// ── User management ───────────────────────────────────────────────────────
+
+// Config local (espelho editável em sessão; fonte da verdade = USUARIOS_CONFIG injetado pelo Python)
+let adminConfig = USUARIOS_CONFIG.length
+  ? USUARIOS_CONFIG.map(u => ({ nome: u.nome.toLowerCase(), perfis: u.perfis || ['preenchimento','dashboard'] }))
+  : JSON.parse(localStorage.getItem('gf_users_config') || '[]');
+
+function getUserPerfis(nome) {
+  if (!adminConfig.length) return ['preenchimento', 'dashboard'];
+  const u = adminConfig.find(u => u.nome === nome);
+  return u ? u.perfis : ['preenchimento', 'dashboard'];
+}
+
+function getSelectableUsers() {
+  return adminConfig.length
+    ? adminConfig.map(u => u.nome)
+    : (JSON.parse(localStorage.getItem('gf_users') || '[]').map(u => u.toLowerCase()));
+}
+
+function applyUserPermissions(nome) {
+  const perfis = getUserPerfis(nome);
+  const hasDash  = perfis.includes('dashboard');
+  const hasPreench = perfis.includes('preenchimento');
+  document.getElementById('tabDash').style.display     = hasDash    ? '' : 'none';
+  document.getElementById('tabConsulta').style.display = hasDash    ? '' : 'none';
+  document.getElementById('tabWork').style.display     = hasPreench ? '' : 'none';
+  const vd = document.getElementById('viewDashboard').style.display;
+  const vc = document.getElementById('viewConsulta').style.display;
+  const currentView = vd !== 'none' ? 'dashboard'
+                    : vc !== 'none' ? 'consulta'
+                    : 'preenchimento';
+  if ((currentView === 'dashboard' || currentView === 'consulta') && !hasDash) {
+    setView(hasPreench ? 'preenchimento' : 'dashboard');
+  } else if (currentView === 'preenchimento' && !hasPreench) {
+    setView(hasDash ? 'dashboard' : 'preenchimento');
+  }
+}
+
+function renderUserChips() {
+  const container = document.getElementById('userChips');
+  const lista = getSelectableUsers();
+  if (!lista.length) {
+    container.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:4px 0">Nenhum usuário cadastrado.</div>';
+    return;
+  }
+  container.innerHTML = lista.map(u => {
+    const perfis = getUserPerfis(u);
+    const badges = (perfis.includes('preenchimento') ? '<span class="perfil-badge p">P</span>' : '') +
+                   (perfis.includes('dashboard')     ? '<span class="perfil-badge d">D</span>' : '');
+    return `<div class="user-chip${u === currentUser ? ' active' : ''}" data-nome="${u}">
+      <span>${u}${badges}</span>
+    </div>`;
+  }).join('');
+  container.querySelectorAll('.user-chip[data-nome]').forEach(chip => {
+    chip.addEventListener('click', () => selectUserChip(chip.dataset.nome));
+  });
+}
+
+function selectUserChip(name) {
+  if (name !== currentUser && records.length > 0 && !exportado) {
+    if (!confirm(`Há ${records.length} registro(s) não exportados de "${currentUser}".\nTrocar para "${name}" agora? Os registros continuam salvos localmente.`)) return;
+  }
+  closeUserModal();
+  currentUser = name;
+  localStorage.setItem('gf_user', name);
+  updateUserBadge();
+  updateSubmitBtn();
+  applyUserPermissions(name);
+}
+
+function openUserModal() {
+  renderUserChips();
+  document.getElementById('modalSelectSection').style.display = '';
+  document.getElementById('modalAdminSection').style.display  = 'none';
+  const el = document.getElementById('modalOverlay');
+  el.style.display = '';
+  el.classList.add('open');
+}
+function closeUserModal() {
+  const el = document.getElementById('modalOverlay');
+  el.classList.remove('open');
+  el.style.display = 'none';
+}
+document.getElementById('modalOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('modalOverlay')) closeUserModal();
+});
+
+// ── Admin panel ──────────────────────────────────────────────────────────
+function openAdminSection() {
+  document.getElementById('modalSelectSection').style.display = 'none';
+  document.getElementById('modalAdminSection').style.display  = '';
+  renderAdminList();
+  const htmlNomes = JSON.stringify(USUARIOS_CONFIG.map(u => u.nome.toLowerCase()).sort());
+  const localNomes = JSON.stringify(adminConfig.map(u => u.nome).sort());
+  const htmlPerfis = JSON.stringify(USUARIOS_CONFIG.map(u => ({n: u.nome.toLowerCase(), p: [...(u.perfis||[])].sort()})).sort((a,b)=>a.n.localeCompare(b.n)));
+  const localPerfis = JSON.stringify(adminConfig.map(u => ({n: u.nome, p: [...u.perfis].sort()})).sort((a,b)=>a.n.localeCompare(b.n)));
+  const diverge = htmlNomes !== localNomes || htmlPerfis !== localPerfis;
+  document.getElementById('adminSyncWarning').style.display = diverge ? '' : 'none';
+}
+function closeAdminSection() {
+  document.getElementById('modalSelectSection').style.display = '';
+  document.getElementById('modalAdminSection').style.display  = 'none';
+  renderUserChips();
+}
+
+function renderAdminList() {
+  const el = document.getElementById('adminUserList');
+  if (!adminConfig.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:4px 0">Nenhum usuário cadastrado.</div>';
+    return;
+  }
+  el.innerHTML = adminConfig.map((u, idx) => {
+    const hasP = u.perfis.includes('preenchimento');
+    const hasD = u.perfis.includes('dashboard');
+    return `<div class="admin-user-row">
+      <span class="admin-user-name">${u.nome}</span>
+      <label class="admin-perfil-check">
+        <input type="checkbox" ${hasP ? 'checked' : ''} onchange="adminTogglePerfil(${idx},'preenchimento',this.checked)"> Preencher
+      </label>
+      <label class="admin-perfil-check">
+        <input type="checkbox" ${hasD ? 'checked' : ''} onchange="adminTogglePerfil(${idx},'dashboard',this.checked)"> Dashboard
+      </label>
+      <button class="user-chip-del" onclick="adminRemoveUser(${idx})" title="remover">&#215;</button>
+    </div>`;
+  }).join('');
+}
+
+function adminTogglePerfil(idx, perfil, checked) {
+  if (checked && !adminConfig[idx].perfis.includes(perfil))
+    adminConfig[idx].perfis.push(perfil);
+  else if (!checked)
+    adminConfig[idx].perfis = adminConfig[idx].perfis.filter(p => p !== perfil);
+  localStorage.setItem('gf_users_config', JSON.stringify(adminConfig));
+  if (adminConfig[idx].nome === currentUser) applyUserPermissions(currentUser);
+}
+
+function adminRemoveUser(idx) {
+  const nome = adminConfig[idx].nome;
+  if (!confirm(`Remover usuário "${nome}"?`)) return;
+  adminConfig.splice(idx, 1);
+  localStorage.setItem('gf_users_config', JSON.stringify(adminConfig));
+  renderAdminList();
+}
+
+function adminAddUser() {
+  const nome = document.getElementById('inputAdminUser').value.trim().toLowerCase();
+  if (!nome) return;
+  if (adminConfig.find(u => u.nome === nome)) {
+    alert(`Usuário "${nome}" já existe.`); return;
+  }
+  const perfis = [];
+  if (document.getElementById('chkPreenchimento').checked) perfis.push('preenchimento');
+  if (document.getElementById('chkDashboard').checked)     perfis.push('dashboard');
+  if (!perfis.length) { alert('Selecione pelo menos um perfil.'); return; }
+  adminConfig.push({ nome, perfis });
+  localStorage.setItem('gf_users_config', JSON.stringify(adminConfig));
+  document.getElementById('inputAdminUser').value = '';
+  renderAdminList();
+}
+document.getElementById('inputAdminUser').onkeydown = e => { if (e.key === 'Enter') adminAddUser(); };
+
+function adminExportJson() {
+  const blob = new Blob([JSON.stringify(adminConfig, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'usuarios.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  document.getElementById('adminSyncWarning').style.display = 'none';
+  showToast('usuarios.json baixado — coloque na pasta do projeto e rode ATUALIZAR.bat');
+}
+
+function updateUserBadge() {
+  document.getElementById('userBadge').textContent = currentUser || 'Selecionar usuário';
+}
+
+// ── Navegação entre telas ─────────────────────────────────────────────────
+function setView(name) {
+  const perfis = getUserPerfis(currentUser);
+  const viewPerfil = name === 'consulta' ? 'dashboard' : name;
+  if (currentUser && !perfis.includes(viewPerfil)) return;
+  document.getElementById('viewDashboard').style.display     = name === 'dashboard'    ? '' : 'none';
+  document.getElementById('viewPreenchimento').style.display = name === 'preenchimento' ? '' : 'none';
+  document.getElementById('viewConsulta').style.display      = name === 'consulta'     ? '' : 'none';
+  document.getElementById('exportBar').style.display         = name === 'preenchimento' ? '' : 'none';
+  document.getElementById('tabDash').classList.toggle('active', name === 'dashboard');
+  document.getElementById('tabWork').classList.toggle('active', name === 'preenchimento');
+  document.getElementById('tabConsulta').classList.toggle('active', name === 'consulta');
+  if (name === 'dashboard') renderDashboard();
+  if (name === 'consulta')  { populateConsultaFilters(); renderConsulta(); }
+}
+
+// ── Status por fazenda ────────────────────────────────────────────────────
+function getFazStatus(name) {
+  const tals = Object.values(FAZENDAS[name]?.talhoes || {});
+  if (!tals.length) return { status: '—', cls: 'muted', ciclo: '—' };
+  const total  = tals.length;
+  const done   = tals.filter(t => t.exp === 'CONCLUIDO' || t.exp === 'SEM LINHAS' || t.tipo === 'SEM LINHAS').length;
+  const ciclo  = tals.find(t => t.ciclo)?.ciclo || '—';
+  let status, cls;
+  if (done === total)  { status = 'CONCLUÍDO'; cls = 'green'; }
+  else                 { status = 'A FAZER';   cls = 'blue';  }
+  return { status, cls, ciclo };
+}
+
+// ── Plano da Semana ───────────────────────────────────────────────────────
+function _getWeekKey() {
+  const d = new Date();
+  const dow = d.getDay(); // 0=Dom, 1=Seg, ..., 6=Sab
+  const toMonday = (dow === 0) ? -6 : 1 - dow;
+  const monday = new Date(d);
+  monday.setDate(d.getDate() + toMonday);
+  return monday.toISOString().slice(0, 10);
+}
+const planKey     = 'gf_plan_'      + _getWeekKey();
+const planDoneKey = 'gf_plan_done_' + _getWeekKey();
+
+let planFazendas = [];
+try { planFazendas = JSON.parse(localStorage.getItem(planKey) || '[]'); } catch(e) { planFazendas = []; }
+
+let planFazendasDone = new Set();
+try { planFazendasDone = new Set(JSON.parse(localStorage.getItem(planDoneKey) || '[]')); } catch(e) {}
+
+function savePlan()     { localStorage.setItem(planKey,     JSON.stringify(planFazendas)); }
+function savePlanDone() { localStorage.setItem(planDoneKey, JSON.stringify([...planFazendasDone])); }
+
+function addToPlano(name) {
+  if (planFazendas.includes(name)) return;
+  planFazendas.push(name);
+  savePlan();
+  renderPlano();
+  updateStats();
+  document.getElementById('planSearch').value = '';
+  document.getElementById('planDropdown').classList.remove('open');
+}
+
+function removeFromPlano(name) {
+  planFazendas = planFazendas.filter(f => f !== name);
+  savePlan();
+  renderPlano();
+  updateStats();
+}
+
+function limparPlano() {
+  if (!planFazendas.length) return;
+  if (!confirm('Limpar o plano do dia?')) return;
+  planFazendas = [];
+  savePlan();
+  renderPlano();
+  updateStats();
+}
+
+function renderPlano() {
+  const registered = new Set(records.map(r => r.fazenda));
+  const done = planFazendas.filter(f => registered.has(f) || planFazendasDone.has(f)).length;
+  document.getElementById('planCount').textContent = `${done}/${planFazendas.length}`;
+
+  if (!planFazendas.length) {
+    document.getElementById('planList').innerHTML = '<div class="plan-empty">Nenhuma fazenda no plano</div>';
+    return;
+  }
+  document.getElementById('planList').innerHTML = planFazendas.map(name => {
+    const isDoneRec  = registered.has(name);
+    const isDoneMark = planFazendasDone.has(name);
+    const isDone     = isDoneRec || isDoneMark;
+    const { status, cls, ciclo } = getFazStatus(name);
+    const nTal = Object.keys(FAZENDAS[name]?.talhoes || {}).length;
+    const esc = name.replace(/'/g, "\\'");
+    const checkIcon = isDoneRec ? '&#9745;' : isDoneMark ? '&#9733;' : '&#9744;';
+    return `<div class="plan-item${isDone ? ' done' : ''}" onclick="goToFazenda('${esc}')" oncontextmenu="openPlanCtxMenu(event,'${esc}')">
+      <span class="plan-check" title="${isDoneMark && !isDoneRec ? 'Marcada manualmente' : ''}">${checkIcon}</span>
+      <div class="plan-item-info">
+        <div class="plan-item-name">${name}</div>
+        <div class="plan-item-meta">
+          <span class="faz-tag faz-tag-${cls}">${status}</span>
+          <span class="faz-tag faz-tag-muted">${ciclo}</span>
+          <span style="color:var(--muted)">${nTal} tal.</span>
+        </div>
+      </div>
+      <button class="plan-item-del" onclick="event.stopPropagation();removeFromPlano('${esc}')">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function goToFazenda(name) {
+  setView('preenchimento');
+  selectFazenda(name);
+}
+
+// ── Plano – menu de contexto ──────────────────────────────────────────────
+let _planCtxFaz = null;
+
+function openPlanCtxMenu(e, name) {
+  e.preventDefault();
+  e.stopPropagation();
+  _planCtxFaz = name;
+  const isDone = planFazendasDone.has(name);
+  const item = document.getElementById('planCtxDoneItem');
+  if (item) item.innerHTML = isDone
+    ? '&#9744; Desmarcar como feita'
+    : '&#9733; Marcar como feita';
+  const menu = document.getElementById('planCtxMenu');
+  menu.style.left = Math.min(e.clientX, window.innerWidth  - 210) + 'px';
+  menu.style.top  = Math.min(e.clientY, window.innerHeight - 110) + 'px';
+  menu.classList.add('open');
+}
+
+function closePlanCtxMenu() {
+  document.getElementById('planCtxMenu').classList.remove('open');
+  _planCtxFaz = null;
+}
+
+function planCtxAbrir() {
+  const n = _planCtxFaz; closePlanCtxMenu();
+  if (n) goToFazenda(n);
+}
+
+function planCtxRemover() {
+  const n = _planCtxFaz; closePlanCtxMenu();
+  if (n) removeFromPlano(n);
+}
+
+function planCtxConcluir() {
+  const n = _planCtxFaz; closePlanCtxMenu();
+  if (!n) return;
+
+  if (planFazendasDone.has(n)) {
+    planFazendasDone.delete(n);
+    showToast(`"${n}" desmarcada.`);
+  } else {
+    planFazendasDone.add(n);
+    showToast(`"${n}" marcada como feita. ★`);
+  }
+  savePlanDone();
+  renderPlano();
+  updateStats();
+}
+
+function renderPlanDropdown(q) {
+  const dd = document.getElementById('planDropdown');
+  if (!q) { dd.classList.remove('open'); return; }
+  const ql = q.toLowerCase();
+  const allMatches = FAZENDA_NAMES.filter(n => n.toLowerCase().includes(ql) || String(FAZENDAS[n].cod).includes(q));
+  const matches = allMatches.slice(0, 10);
+  if (!matches.length) { dd.classList.remove('open'); return; }
+  const extra = allMatches.length - matches.length;
+  dd.innerHTML = matches.map(n => {
+    const inPlan = planFazendas.includes(n);
+    const { status, cls } = getFazStatus(n);
+    return `<div class="plan-dropdown-item${inPlan ? ' already' : ''}" onmousedown="addToPlano('${n.replace(/'/g,"\\'")}')">
+      <span style="font-weight:600">${n}</span>
+      <span class="faz-tag faz-tag-${cls}" style="float:right">${status}</span>
+    </div>`;
+  }).join('') + (extra > 0 ? `<div style="padding:6px 10px;font-size:11px;color:var(--muted)">+ ${extra} outros resultados</div>` : '');
+  dd.classList.add('open');
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.plan-search-wrap'))
+    document.getElementById('planDropdown').classList.remove('open');
+});
+
+// ── Consulta ──────────────────────────────────────────────────────────────
+let _consultaDebounceTimer = null;
+function debouncedRenderConsulta() {
+  clearTimeout(_consultaDebounceTimer);
+  _consultaDebounceTimer = setTimeout(renderConsulta, 200);
+}
+function populateConsultaFilters() {
+  const meses = new Set(), frentes = new Set();
+  FAZENDA_NAMES.forEach(n => {
+    Object.values(FAZENDAS[n].talhoes).forEach(t => {
+      const ym = talYM(t);
+      if (ym) meses.add(ym);
+      if (t.frente) frentes.add(t.frente);
+    });
+  });
+  const selMes = document.getElementById('cFiltroMes');
+  const curMes = selMes.value;
+  selMes.innerHTML = '<option value="">— todos os meses —</option>' +
+    [...meses].sort().map(ym => {
+      const [y, m] = ym.split('-');
+      const nome = new Date(+y, +m - 1).toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+      return `<option value="${ym}">${nome.charAt(0).toUpperCase() + nome.slice(1)}</option>`;
+    }).join('');
+  selMes.value = curMes;
+
+  const selFre = document.getElementById('cFiltroFrente');
+  const curFre = selFre.value;
+  selFre.innerHTML = '<option value="">— todas as frentes —</option>' +
+    [...frentes].sort((a,b)=>a-b).map(f => `<option value="${f}">Frente ${f}</option>`).join('');
+  selFre.value = curFre;
+}
+
+function limparFiltrosConsulta() {
+  document.getElementById('cFiltroMes').value    = '';
+  document.getElementById('cFiltroFrente').value = '';
+  document.getElementById('cFiltroStatus').value = '';
+  renderConsulta();
+}
+
+const CONSULTA_PAGE_SIZE = 50;
+let _consultaPage = 0;
+let _consultaNames = [];
+let _consultaSelected = new Set();
+let _consultaSelectMode = false;
+
+function toggleConsultaSelectMode() {
+  _consultaSelectMode = !_consultaSelectMode;
+  if (!_consultaSelectMode) {
+    _consultaSelected.clear();
+    updateConsultaSelBar();
+  }
+  const btn = document.getElementById('btnConsultaSel');
+  if (btn) {
+    btn.classList.toggle('active-green', _consultaSelectMode);
+    btn.textContent = _consultaSelectMode ? '☑ Selecionar' : '☐ Selecionar';
+  }
+  renderConsulta();
+}
+
+function updateConsultaSelBar() {
+  const n = _consultaSelected.size;
+  const bar = document.getElementById('consultaSelBar');
+  const countEl = document.getElementById('consultaSelCount');
+  if (bar) bar.classList.toggle('open', n > 0);
+  if (countEl) countEl.textContent = `${n} fazenda${n !== 1 ? 's' : ''} selecionada${n !== 1 ? 's' : ''}`;
+}
+
+function toggleConsultaSel(name, cb) {
+  if (cb.checked) _consultaSelected.add(name);
+  else _consultaSelected.delete(name);
+  updateConsultaSelBar();
+  const row = document.getElementById('cfr-' + CSS.escape(name));
+  if (row) row.classList.toggle('selected', cb.checked);
+}
+
+function clearConsultaSel() {
+  _consultaSelected.clear();
+  updateConsultaSelBar();
+  renderConsulta(_consultaPage);
+}
+
+function addSelectedToPlano() {
+  const n = _consultaSelected.size;
+  if (!n) return;
+  _consultaSelected.forEach(name => addToPlano(name));
+  showToast(`${n} fazenda${n !== 1 ? 's' : ''} adicionada${n !== 1 ? 's' : ''} ao plano.`);
+  clearConsultaSel();
+}
+
+function renderConsulta(page) {
+  if (page === undefined) { _consultaPage = 0; }
+  else { _consultaPage = page; }
+
+  const q          = (document.getElementById('consultaSearch')?.value || '').toLowerCase();
+  const filtMes    = document.getElementById('cFiltroMes')?.value    || '';
+  const filtFrente = document.getElementById('cFiltroFrente')?.value || '';
+  const filtStatus = document.getElementById('cFiltroStatus')?.value || '';
+
+  document.getElementById('cFiltroMes').classList.toggle('active', !!filtMes);
+  document.getElementById('cFiltroFrente').classList.toggle('active', !!filtFrente);
+  document.getElementById('cFiltroStatus').classList.toggle('active', !!filtStatus);
+
+  let names = q
+    ? FAZENDA_NAMES.filter(n => n.toLowerCase().includes(q) || String(FAZENDAS[n].cod).includes(q))
+    : FAZENDA_NAMES;
+
+  if (filtFrente) names = names.filter(n =>
+    Object.values(FAZENDAS[n].talhoes).some(t => String(t.frente) === filtFrente));
+  if (filtMes) names = names.filter(n =>
+    Object.values(FAZENDAS[n].talhoes).some(t => talYM(t) === filtMes));
+  if (filtStatus) names = names.filter(n => getFazStatus(n).status === filtStatus);
+
+  _consultaNames = names;
+  const total = names.length;
+  const totalPages = Math.max(1, Math.ceil(total / CONSULTA_PAGE_SIZE));
+  _consultaPage = Math.min(_consultaPage, totalPages - 1);
+  const pageNames = names.slice(_consultaPage * CONSULTA_PAGE_SIZE, (_consultaPage + 1) * CONSULTA_PAGE_SIZE);
+
+  const countEl = document.getElementById('consultaCount');
+  if (countEl) countEl.textContent = `${total} fazenda${total !== 1 ? 's' : ''}`;
+
+  const el = document.getElementById('consultaResults');
+  if (!total) {
+    el.innerHTML = '<div style="color:var(--muted);padding:24px;text-align:center">Nenhuma fazenda encontrada.</div>';
+    return;
+  }
+
+  const rows = pageNames.map(name => {
+    const d = FAZENDAS[name];
+    const allTals = Object.values(d.talhoes);
+    const tals = allTals.filter(t =>
+      (!filtMes    || talYM(t) === filtMes) &&
+      (!filtFrente || String(t.frente) === filtFrente)
+    );
+    const totalTals = tals.length;
+    const conc  = tals.filter(isTalDone).length;
+    const { status, cls, ciclo } = getFazStatus(name);
+    const frentes = [...new Set(tals.map(t => t.frente).filter(Boolean))].sort((a,b)=>a-b).join(', ') || '—';
+    const haTotal = tals.reduce((s, t) => s + (t.ha || 0), 0);
+    const escName = name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const cbTd = _consultaSelectMode
+      ? `<td class="consulta-cb" onclick="event.stopPropagation()"><input type="checkbox" ${_consultaSelected.has(name) ? 'checked' : ''} onclick="toggleConsultaSel('${escName}',this)"></td>`
+      : '';
+    return `<tr class="consulta-faz-row${_consultaSelected.has(name) ? ' selected' : ''}" onclick="toggleFazDetail('${escName}',this,'${filtMes}','${filtFrente}')" oncontextmenu="openCtxMenu(event,'${escName}')" id="cfr-${CSS.escape(name)}">
+      ${cbTd}
+      <td><span class="consulta-expand-icon" id="cfi-${CSS.escape(name)}">▶</span><strong>${name}</strong></td>
+      <td style="font-family:monospace">${d.cod}</td>
+      <td>${frentes}</td>
+      <td><span class="faz-tag faz-tag-muted">${ciclo}</span></td>
+      <td><span class="faz-tag faz-tag-${cls}">${status}</span></td>
+      <td style="font-family:monospace">${conc}/${totalTals}</td>
+      <td style="font-family:monospace">${haTotal.toFixed(1)} ha</td>
+    </tr>
+    <tr id="cdr-${CSS.escape(name)}" style="display:none">
+      <td colspan="${_consultaSelectMode ? 8 : 7}"><div class="consulta-detail-inner" id="cdinner-${CSS.escape(name)}"></div></td>
+    </tr>`;
+  }).join('');
+
+  const paginacao = totalPages > 1 ? `
+    <div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:12px 0">
+      <button class="faz-filter-btn" ${_consultaPage === 0 ? 'disabled style="opacity:.4"' : ''}
+        onclick="renderConsulta(${_consultaPage - 1})">← Anterior</button>
+      <span style="font-size:12px;color:var(--muted)">Pág. ${_consultaPage + 1} / ${totalPages}</span>
+      <button class="faz-filter-btn" ${_consultaPage >= totalPages - 1 ? 'disabled style="opacity:.4"' : ''}
+        onclick="renderConsulta(${_consultaPage + 1})">Próxima →</button>
+    </div>` : '';
+
+  el.innerHTML = `<div class="form-card" style="overflow-x:auto">
+    <table class="consulta-table">
+      <thead><tr>
+        ${_consultaSelectMode ? '<th style="width:36px"></th>' : ''}
+        <th>Fazenda</th><th>Cód</th><th>Frente</th><th>Ciclo</th>
+        <th>Status</th><th>Talhões</th><th>Área</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    ${paginacao}
+  </div>`;
+}
+
+function toggleFazDetail(name, rowEl, filtMesArg, filtFrenteArg) {
+  const esc = CSS.escape(name);
+  const detailRow = document.getElementById('cdr-' + esc);
+  const inner     = document.getElementById('cdinner-' + esc);
+  const icon      = document.getElementById('cfi-' + esc);
+  if (!detailRow) return;
+  const isOpen    = detailRow.style.display !== 'none';
+
+  document.querySelectorAll('[id^="cdr-"]').forEach(r => {
+    r.style.display = 'none';
+    const prevRow = r.previousElementSibling;
+    if (prevRow) prevRow.classList.remove('expanded');
+  });
+  document.querySelectorAll('.consulta-expand-icon').forEach(i => i.textContent = '▶');
+
+  if (isOpen) return;
+
+  detailRow.style.display = '';
+  rowEl.classList.add('expanded');
+  icon.textContent = '▼';
+
+  const allTals = FAZENDAS[name].talhoes;
+  const sorted = Object.keys(allTals).sort((a, b) => +a - +b).filter(t => {
+    const td = allTals[t];
+    return (!filtMesArg    || talYM(td) === filtMesArg) &&
+           (!filtFrenteArg || String(td.frente) === filtFrenteArg);
+  });
+  const talRows = sorted.map(t => {
+    const td = allTals[t];
+    const stCls = isTalDone(td) ? (td.exp === 'CONCLUIDO' ? 'green' : 'muted') : 'blue';
+    const stLbl = td.exp === 'CONCLUIDO' ? 'Concluído' : (td.exp === 'SEM LINHAS' || td.tipo === 'SEM LINHAS') ? 'Sem Linhas' : 'A Fazer';
+    const _ym   = talYM(td);
+    const data  = _ym ? _ym.split('-').reverse().join('/') : '—';
+    return `<tr>
+      <td style="font-family:monospace;font-weight:700">${t}</td>
+      <td>${td.tipo || '—'}</td>
+      <td><span class="faz-tag faz-tag-${stCls}" style="font-size:10px">${stLbl}</span></td>
+      <td style="font-family:monospace">${(td.ha || 0).toFixed(1)} ha</td>
+      <td>${td.estagio || '—'}</td>
+      <td style="font-family:monospace">${data}</td>
+    </tr>`;
+  }).join('');
+
+  inner.innerHTML = `<table class="consulta-detail-table">
+    <thead><tr>
+      <th>Talhão</th><th>Tipo</th><th>Status</th><th>Área</th><th>Estágio</th><th>Mês</th>
+    </tr></thead>
+    <tbody>${talRows}</tbody>
+  </table>`;
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────────────
+let _chartFrente = null, _chartMes = null, _chartUsuario = null, _chart18m = null;
+
+function getThemeColors() {
+  const s = getComputedStyle(document.documentElement);
+  return {
+    green:  s.getPropertyValue('--green').trim()   || '#4CAF72',
+    accent: s.getPropertyValue('--accent').trim()  || '#C8960C',
+    blue:   s.getPropertyValue('--blue').trim()    || '#5A9FD4',
+    muted:  s.getPropertyValue('--muted').trim()   || '#7A8875',
+    text:   s.getPropertyValue('--text').trim()    || '#E5EAE0',
+    border: s.getPropertyValue('--border').trim()  || '#36422F',
+    surface2: s.getPropertyValue('--surface2').trim() || '#252E22',
+    surface:  s.getPropertyValue('--surface').trim()  || '#1C231A',
+  };
+}
+
+function isTalDone(t) {
+  return t.exp === 'CONCLUIDO' || t.exp === 'SEM LINHAS' || t.tipo === 'SEM LINHAS';
+}
+
+function computeDash() {
+  let haTotal = 0, haConc = 0, haFazer = 0, haSemLin = 0;
+  let fazConc = 0;
+  let ha18Total = 0, ha18Conc = 0, ha18Fazer = 0;
+  const byFrente = {}, byMonth = {};
+
+  FAZENDA_NAMES.forEach(name => {
+    const tals = Object.values(FAZENDAS[name].talhoes);
+    const allConc = tals.length > 0 && tals.every(isTalDone);
+    if (allConc) fazConc++;
+
+    tals.forEach(t => {
+      const ha = t.ha || 0;
+      const semLin = t.exp === 'SEM LINHAS' || t.tipo === 'SEM LINHAS';
+      haTotal += ha;
+      if (semLin)              haSemLin += ha;
+      if (isTalDone(t))        haConc   += ha;
+      else                     haFazer  += ha;
+
+      {
+        const f = t.frente ? 'Frente ' + t.frente : 'Indefinida';
+        if (!byFrente[f]) byFrente[f] = { conc: 0, fazer: 0 };
+        isTalDone(t) ? byFrente[f].conc += ha : byFrente[f].fazer += ha;
+      }
+
+      {
+        const ym = talYM(t) || 'sem-mes';
+        if (!byMonth[ym]) byMonth[ym] = { total: 0, conc: 0 };
+        byMonth[ym].total += ha;
+        if (isTalDone(t)) byMonth[ym].conc += ha;
+      }
+
+      if (is18m(t.estagio)) {
+        ha18Total += ha;
+        if (isTalDone(t)) ha18Conc += ha;
+        else              ha18Fazer += ha;
+      }
+    });
+  });
+
+  return {
+    haTotal, haConc, haFazer, haSemLin,
+    fazTotal: FAZENDA_NAMES.length, fazConc,
+    pct: haTotal > 0 ? Math.round(haConc / haTotal * 100) : 0,
+    byFrente, byMonth,
+    ha18Total, ha18Conc, ha18Fazer
+  };
+}
+
+function renderDashboard() {
+  const d = computeDash();
+  const c = getThemeColors();
+
+  // Timestamp
+  const ts = document.getElementById('dashTimestamp');
+  if (ts) ts.textContent = 'Atualizado em ' + new Date().toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+
+  // Barra de progresso
+  const fill = document.getElementById('dashProgressFill');
+  const pctEl = document.getElementById('dashProgressPct');
+  if (fill) fill.style.width = d.pct + '%';
+  if (pctEl) pctEl.textContent = d.pct + '%';
+
+  // KPI cards
+  const fmtHa = v => v.toLocaleString('pt-BR', {minimumFractionDigits:0, maximumFractionDigits:0});
+  document.getElementById('dashKpiRow').innerHTML = [
+    { label: 'Total Fazendas', val: d.fazTotal.toLocaleString('pt-BR'), sub: `${d.fazConc} fazenda${d.fazConc!==1?'s':''} concluída${d.fazConc!==1?'s':''}`, cls: '' },
+    { label: 'Área Total',     val: fmtHa(d.haTotal), sub: 'hectares programados', cls: '' },
+    { label: 'Ha Concluído',   val: fmtHa(d.haConc),  sub: `${d.pct}% do total`, cls: 'green' },
+    { label: 'Ha A Fazer',     val: fmtHa(d.haFazer), sub: 'hectares restantes', cls: 'blue' },
+    { label: 'Ha Sem Linhas',  val: fmtHa(d.haSemLin),sub: 'incluído em concluído', cls: 'accent' },
+  ].map(k => `<div class="dash-kpi-card${k.cls ? ' ' + k.cls : ''}">
+    <div class="dash-kpi-label">${k.label}</div>
+    <div class="dash-kpi-value">${k.val}</div>
+    <div class="dash-kpi-sub">${k.sub}</div>
+  </div>`).join('');
+
+  Chart.defaults.color = c.muted;
+  Chart.defaults.borderColor = c.border;
+
+  const gridLine = c.border + '55';
+  const fmtTooltip = (label, val) => ` ${label}: ${val.toLocaleString('pt-BR',{maximumFractionDigits:0})} ha`;
+
+  // ── Ha por Mês ───────────────────────────────────────────────────────────
+  const months = Object.keys(d.byMonth).sort((a, b) => {
+    if (a === 'sem-mes') return 1;
+    if (b === 'sem-mes') return -1;
+    return a < b ? -1 : a > b ? 1 : 0;
+  });
+  const fmtMes = ym => {
+    if (ym === 'sem-mes') return 'Indefinido';
+    const [y, m] = ym.split('-');
+    return ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][+m-1] + '/' + y.slice(2);
+  };
+  if (_chartMes) _chartMes.destroy();
+  _chartMes = new Chart(document.getElementById('chartMes'), {
+    type: 'bar',
+    data: {
+      labels: months.map(fmtMes),
+      datasets: [
+        { label: 'Concluído', data: months.map(m => +d.byMonth[m].conc.toFixed(0)),
+          backgroundColor: c.green + 'BB',
+          maxBarThickness: 64,
+          borderRadius: { topLeft: 0, topRight: 0, bottomLeft: 5, bottomRight: 5 },
+          borderSkipped: 'top' },
+        { label: 'A Fazer',   data: months.map(m => +(d.byMonth[m].total - d.byMonth[m].conc).toFixed(0)),
+          backgroundColor: c.blue  + 'BB',
+          maxBarThickness: 64,
+          borderRadius: { topLeft: 5, topRight: 5, bottomLeft: 0, bottomRight: 0 },
+          borderSkipped: 'bottom' },
+      ]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        x: { stacked: true, grid: { display: false },
+             ticks: { font: { size: 11, weight: '600' } },
+             categoryPercentage: 0.7, barPercentage: 0.85 },
+        y: { stacked: true, grid: { color: gridLine }, ticks: { font: { size: 10 } },
+             title: { display: true, text: 'Hectares', font: { size: 10 } } }
+      },
+      plugins: {
+        legend: { position: 'bottom', labels: { padding: 18, font: { size: 12 }, boxWidth: 12, boxHeight: 12 } },
+        tooltip: { callbacks: { label: ctx => fmtTooltip(ctx.dataset.label, ctx.raw) } }
+      }
+    }
+  });
+
+  // ── Ha por Frente (barras horizontais, ordenado por total desc) ──────────
+  const fLabels = Object.keys(d.byFrente).sort((a, b) => {
+    if (a === 'Indefinida') return 1;
+    if (b === 'Indefinida') return -1;
+    const na = parseInt(a.replace('Frente ', '')) || 0;
+    const nb = parseInt(b.replace('Frente ', '')) || 0;
+    return na - nb;
+  });
+  if (_chartFrente) _chartFrente.destroy();
+  _chartFrente = new Chart(document.getElementById('chartFrente'), {
+    type: 'bar',
+    data: {
+      labels: fLabels,
+      datasets: [
+        { label: 'Concluído', data: fLabels.map(f => +d.byFrente[f].conc.toFixed(0)),
+          backgroundColor: c.green + 'BB', maxBarThickness: 32,
+          borderRadius: { topLeft: 5, bottomLeft: 5, topRight: 0, bottomRight: 0 },
+          borderSkipped: 'right' },
+        { label: 'A Fazer',   data: fLabels.map(f => +d.byFrente[f].fazer.toFixed(0)),
+          backgroundColor: c.blue  + 'BB', maxBarThickness: 32,
+          borderRadius: { topLeft: 0, bottomLeft: 0, topRight: 5, bottomRight: 5 },
+          borderSkipped: 'left' },
+      ]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { stacked: true, grid: { color: gridLine }, ticks: { font: { size: 11 } },
+             title: { display: true, text: 'Hectares', font: { size: 11 } } },
+        y: { stacked: true, grid: { display: false }, ticks: { font: { size: 12, weight: '600' } } }
+      },
+      plugins: {
+        legend: { position: 'bottom', labels: { padding: 18, font: { size: 12 }, boxWidth: 12, boxHeight: 12 } },
+        tooltip: { callbacks: { label: ctx => fmtTooltip(ctx.dataset.label, ctx.raw) } }
+      }
+    }
+  });
+
+  // ── Ha por Usuário ───────────────────────────────────────────────────────
+  const uLabels = Object.keys(USUARIOS_HA).filter(u => (USUARIOS_HA[u] || 0) > 0);
+  const uCard = document.getElementById('chartUsuarioCard');
+  uCard.style.display = uLabels.length ? '' : 'none';
+  if (uLabels.length) {
+    if (_chartUsuario) _chartUsuario.destroy();
+    const palette = [c.green, c.blue, c.accent, c.muted];
+    _chartUsuario = new Chart(document.getElementById('chartUsuario'), {
+      type: 'bar',
+      data: {
+        labels: uLabels,
+        datasets: [{ label: 'Ha registrado', data: uLabels.map(u => +(USUARIOS_HA[u]||0).toFixed(1)),
+          backgroundColor: uLabels.map((_, i) => palette[i % palette.length] + 'BB'),
+          borderColor:     uLabels.map((_, i) => palette[i % palette.length]),
+          borderWidth: 1.5, borderRadius: 6, borderSkipped: false }]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 13, weight: '600' } } },
+          y: { grid: { color: gridLine }, ticks: { font: { size: 11 } },
+               title: { display: true, text: 'Hectares', font: { size: 11 } } }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: ctx => ` ${ctx.raw.toLocaleString('pt-BR',{maximumFractionDigits:1})} ha` } }
+        }
+      }
+    });
+  }
+
+  // ── Talhões 18m ─────────────────────────────────────────────────────────
+  if (_chart18m) _chart18m.destroy();
+  _chart18m = new Chart(document.getElementById('chart18m'), {
+    type: 'bar',
+    data: {
+      labels: ['Total 18m', 'Concluído', 'A Fazer'],
+      datasets: [{
+        label: 'Hectares',
+        data: [d.ha18Total, d.ha18Conc, d.ha18Fazer],
+        backgroundColor: [c.muted + '77', c.green + 'BB', c.blue + 'BB'],
+        borderColor:     [c.muted, c.green, c.blue],
+        borderWidth: 1.5, borderRadius: 6, borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 13, weight: '600' } } },
+        y: { grid: { color: gridLine }, ticks: { font: { size: 11 } },
+             title: { display: true, text: 'Hectares', font: { size: 11 } } }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.raw.toLocaleString('pt-BR',{maximumFractionDigits:0})} ha` } }
+      }
+    }
+  });
+}
+
+// ── Theme toggle ──────────────────────────────────────────────────────────
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  const next = isDark ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  localStorage.setItem('gf_theme', next);
+  document.getElementById('themeToggle').innerHTML = next === 'dark' ? '&#9790;' : '&#9788;';
+  if (document.getElementById('viewDashboard').style.display !== 'none') renderDashboard();
+}
+(function() {
+  const saved = localStorage.getItem('gf_theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', saved);
+  const btn = document.getElementById('themeToggle');
+  if (btn) btn.innerHTML = saved === 'dark' ? '&#9790;' : '&#9788;';
+})();
+
+// ── Toast ─────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+</script>
+</body>
+</html>
