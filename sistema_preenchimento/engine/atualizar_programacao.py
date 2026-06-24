@@ -28,7 +28,8 @@ _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _BASE_DIR   = os.path.dirname(_SCRIPT_DIR)   # sistema_preenchimento/
 sys.path.insert(0, _SCRIPT_DIR)
 from utils import (layer_to_str, norm_header, parse_talhoes, redirecionar_stdout, fechar_log,
-                    achar_header, data_para_iso, rollup_sist_conser, SIST_CONSER_PRECISA_MAPEAMENTO)
+                    achar_header, data_para_iso, rollup_sist_conser, SIST_CONSER_PRECISA_MAPEAMENTO,
+                    normaliza_sist_conser)
 
 _log_fh = redirecionar_stdout(os.path.join(_BASE_DIR, 'logs', 'atualizar.log'))
 
@@ -161,7 +162,7 @@ for SOURCE_PREPARO in _preparo_found:
             talhao  = int(tal_raw)
         except (ValueError, TypeError):
             continue
-        sist_conser_por_layer[(cod_faz, talhao)] = str(sc_raw).strip().upper() if sc_raw else '-'
+        sist_conser_por_layer[(cod_faz, talhao)] = normaliza_sist_conser(sc_raw)
     print(f"    {len(sist_conser_por_layer) - n_antes} talhão(ões) novo(s)/atualizado(s).")
 
 print(f"  {len(sist_conser_por_layer)} talhão(ões) com Sist. Conser. no total (todas as planilhas de preparo).\n")
@@ -263,7 +264,7 @@ for r in exploded:
         sem_area += 1
     sist_conser = sist_conser_por_layer.get((r['cod_faz'], r['talhao']))
     if sist_conser is None:
-        sist_conser = ''   # ainda sem registro na base de preparo — não confundir com '-' (que é um valor real da planilha)
+        sist_conser = ''   # ainda sem registro na base de preparo (mesmo valor canônico de "vazio")
         sem_sist_conser += 1
     periodo_op = None
     if r['mes_plantio']:
@@ -308,18 +309,25 @@ def _status_inicial(bloco_id, mapeamento):
 
 novos = 0
 corrigidos = 0
+mapeamento_corrigido = 0
 prog_rows = []
 for layer_val, rec in por_layer.items():
     ly_str = layer_to_str(layer_val)
+    sc_bloco = _bloco_rollup.get(rec['bloco_id'], '')
+    # Base larga/vazio não tem o que mapear — Mapeamento já nasce/fica 'Sim' (ver SETUP.md).
+    sem_mapeamento_pendente = sc_bloco not in SIST_CONSER_PRECISA_MAPEAMENTO
     if ly_str in preserved:
         mapeamento, projeto = preserved[ly_str]
+        if sem_mapeamento_pendente and mapeamento != 'Sim':
+            mapeamento = 'Sim'
+            mapeamento_corrigido += 1
         if projeto in ('Pendente', 'Aguard. Map.'):
             novo_projeto = _status_inicial(rec['bloco_id'], mapeamento)
             if novo_projeto != projeto:
                 corrigidos += 1
             projeto = novo_projeto
     else:
-        mapeamento = 'Não'
+        mapeamento = 'Sim' if sem_mapeamento_pendente else 'Não'
         projeto = _status_inicial(rec['bloco_id'], mapeamento)
         novos += 1
     prog_rows.append(dict(rec, mapeamento=mapeamento, projeto=projeto))
@@ -337,7 +345,8 @@ for i in range(0, len(prog_rows), BATCH):
         sys.exit(1)
     print(f"  {min(i+BATCH, len(prog_rows))}/{len(prog_rows)}")
 
-print(f"\n  Upsert concluído. Novas linhas: {novos}. Status corrigido (Pendente ⇄ Aguard. Map.): {corrigidos}.\n")
+print(f"\n  Upsert concluído. Novas linhas: {novos}. Status corrigido (Pendente ⇄ Aguard. Map.): {corrigidos}. "
+      f"Mapeamento auto-corrigido p/ Sim (Base larga/vazio): {mapeamento_corrigido}.\n")
 
 # ── Aviso: LAYERs com preenchimento removidos desta atualização ───────────
 layers_novos_str = {layer_to_str(r['layer']) for r in prog_rows}

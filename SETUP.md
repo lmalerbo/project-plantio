@@ -92,7 +92,13 @@ Enviados pelo botão **"📎 Arquivos do projeto"** no painel de cada bloco, den
 A demanda de Plantio cruza três fontes (ver detalhes no código de `engine/atualizar_programacao.py`):
 
 - **Sequência de Plantio** (`base_plantio/*.xlsx`, aba `Sequencia`) — fazenda + talhões agrupados em **blocos**, Mês de Plantio (prazo), Ciclo, Ambiente.
-- **Preparo** (`base_preparo/*.xlsx`, aba `CONSERVAÇÃO`) — Sist. Conser. por talhão individual (`EMBUTIDO`/`INTERCALADA`/`BASE LARGA`/`-`).
+- **Preparo** (`base_preparo/*.xlsx`, aba `CONSERVAÇÃO`) — Sist. Conser. por talhão individual. A grafia
+  na planilha varia (`EMBUTIDO`/`INTERCALADA`/`INTERCALADO`/`BASE LARGA`/`-`/`SEM DADOS`/vazio) e é
+  normalizada pra um rótulo canônico — ver `normaliza_sist_conser()` em `engine/utils.py` e
+  `normalizaSistConser()` em `formulario.html` (mantidas em sincronia manualmente):
+  - `-`, `SEM DADOS` (e variações) → `''` (vazio)
+  - `BASE LARGA` → `Base larga`
+  - `EMBUTIDO`/`INTERCALADA`/`INTERCALADO` → `Embutido`
 - **Base de Fazendas** (`base_fazendas/*.xlsx`) — área (ha) por COD FAZ + TALHÃO.
 
 A migration `20260624120000_plantio_schema_init.sql` cria `plantio.programacao` já com os campos
@@ -100,7 +106,10 @@ reais da operação: `projeto` (Pendente/Andamento/Ok), `sist_conser`, `mes_plan
 `mapeamento` (Sim/Não) e `bloco_id` (chave de agrupamento por bloco, recalculada pela engine —
 ver comentário no topo do arquivo de migration).
 
-**Regra de negócio**: blocos com `Sist. Conser.` `EMBUTIDO`/`INTERCALADA` exigem `Mapeamento = Sim` antes do `Projeto` poder avançar de Pendente — o formulário já aplica esse bloqueio automaticamente.
+**Regra de negócio**: blocos com `Sist. Conser.` = `Embutido` exigem `Mapeamento = Sim` antes do
+`Projeto` poder avançar de Pendente — o formulário já aplica esse bloqueio automaticamente. Blocos
+`Base larga`/vazio não têm o que mapear — `Mapeamento` já nasce/fica `Sim` automaticamente (engine
+e formulário) e o toggle correspondente fica travado.
 
 ### Rodando a engine
 

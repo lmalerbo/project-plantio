@@ -20,6 +20,9 @@
     --green:    #4CAF72;
     --red:      #D95C5C;
     --blue:     #5A9FD4;
+    --cyan:     #4FC3D9;
+    --orange:   #E0813C;
+    --yellow:   #E0C23C;
     --text:     #E5EAE0;
     --muted:    #7A8875;
     --shadow:   0 2px 8px rgba(0,0,0,.35);
@@ -37,6 +40,9 @@
     --green:    #2D7A4A;
     --red:      #C0392B;
     --blue:     #2A6FA8;
+    --cyan:     #1B7A8C;
+    --orange:   #B85C1E;
+    --yellow:   #B8960E;
     --text:     #1C1F1A;
     --muted:    #6B6B5F;
     --shadow:   0 2px 8px rgba(0,0,0,.10);
@@ -261,6 +267,7 @@
     border-color: var(--accent);
     color: var(--accent);
   }
+  .cob-btn:disabled { opacity: .45; cursor: default; }
 
   /* ── Talhões ── */
   .talhoes-section { margin-bottom: 18px; }
@@ -818,6 +825,8 @@
   .faz-tag-green  { background: rgba(76,175,114,.15);  color: var(--green);  }
   .faz-tag-accent { background: rgba(200,150,12,.15);  color: var(--accent); }
   .faz-tag-blue   { background: rgba(90,159,212,.15);  color: var(--blue);   }
+  .faz-tag-cyan   { background: rgba(79,195,217,.15);  color: var(--cyan);   }
+  .faz-tag-orange { background: rgba(224,129,60,.15);  color: var(--orange); }
   .faz-tag-muted  { background: rgba(122,136,117,.15); color: var(--muted);  }
 
   /* ── Dashboard ── */
@@ -834,7 +843,7 @@
   }
   .dash-header-sub { font-size: 11px; color: var(--muted); font-family: monospace; }
 
-  .dash-kpi-row { display: grid; grid-template-columns: repeat(5,1fr); gap: 14px; }
+  .dash-kpi-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; }
   .dash-kpi-card {
     background: var(--surface); border: 1px solid var(--border);
     border-radius: 10px; padding: 18px 20px; box-shadow: var(--shadow);
@@ -847,6 +856,7 @@
   .dash-kpi-card.green::after  { background: var(--green); }
   .dash-kpi-card.accent::after { background: var(--accent); }
   .dash-kpi-card.blue::after   { background: var(--blue); }
+  .dash-kpi-card.yellow::after { background: var(--yellow); }
   .dash-kpi-card:hover { border-color: var(--muted); }
   .dash-kpi-label {
     font-size: 10px; font-weight: 700; text-transform: uppercase;
@@ -859,6 +869,7 @@
   .dash-kpi-card.green  .dash-kpi-value { color: var(--green); }
   .dash-kpi-card.accent .dash-kpi-value { color: var(--accent); }
   .dash-kpi-card.blue   .dash-kpi-value { color: var(--blue); }
+  .dash-kpi-card.yellow .dash-kpi-value { color: var(--yellow); }
   .dash-kpi-sub { font-size: 11px; color: var(--muted); line-height: 1.4; }
 
   .dash-progress-wrap {
@@ -957,7 +968,7 @@
         <canvas id="chartUsuario" height="200"></canvas>
       </div>
       <div class="dash-chart-card">
-        <div class="dash-chart-title">Talhões Embutido/Intercalada — Total / Mapeado / Falta Mapear</div>
+        <div class="dash-chart-title">Talhões Embutido — Mapeado / Falta Mapear</div>
         <canvas id="chartMapeamento" height="200"></canvas>
       </div>
     </div>
@@ -1027,12 +1038,12 @@
           </div>
         </div>
         <div class="faz-selected-badge" id="fazSelectedBadge" style="display:none"></div>
+        <button class="btn-clear" id="btnClearFaz" style="display:none" onclick="clearFazendaSelection()">Limpar</button>
       </div>
       <div class="faz-filter-row">
         <span class="faz-filter-label">Filtro:</span>
         <button class="faz-filter-btn" id="filterAFazer" onclick="setFazFilter('a_fazer')">A Fazer</button>
         <button class="faz-filter-btn" id="filterMes" onclick="setFazFilter('mes_atual')">Mês</button><select id="mesFilter" class="mes-filter-select" onchange="onMesFilterChange()"></select>
-        <button class="faz-filter-btn" id="filter18m"   onclick="setFazFilter('18m')">Precisa Mapeamento</button>
       </div>
     </div>
 
@@ -1093,7 +1104,7 @@
               <div class="submit-info" id="submitInfo">selecione um bloco</div>
               <div style="display:flex;gap:8px">
                 <button class="btn-modal-cancel" onclick="abrirArquivosProjeto()">📎 Arquivos do projeto</button>
-                <button class="btn-submit" id="btnSubmit" onclick="salvarBloco()" disabled>Salvar →</button>
+                <button class="btn-submit" id="btnSubmit" onclick="salvarBloco()" disabled>Registrar →</button>
               </div>
             </div>
           </div>
@@ -1233,6 +1244,7 @@ const SERVIDOR_URL = 'http://10.120.107.81:5678';
 // ── Data ──────────────────────────────────────────────────────────────────
 const USUARIOS_HA = {};
 const USUARIOS_CONFIG = [];
+const DATA_ENTREGA_POR_LAYER = {};   // layer → data_consolidacao do log em que o Projeto ficou 'Ok' (1ª ocorrência)
 const FAZENDAS = {};
 const FAZENDA_NAMES = Object.keys(FAZENDAS).sort();
 let currentNames = FAZENDA_NAMES;
@@ -1284,7 +1296,7 @@ async function carregarDadosSupabase() {
   try {
     const [programacao, logs, usuarios] = await Promise.all([
       _sbFetchAll(`${SUPABASE_URL}/rest/v1/programacao?select=*`),
-      _sbFetchAll(`${SUPABASE_URL}/rest/v1/log_exportacoes?select=usuario,layer,data_consolidacao&order=data_consolidacao.asc`),
+      _sbFetchAll(`${SUPABASE_URL}/rest/v1/log_exportacoes?select=usuario,layer,data_consolidacao,projeto&order=data_consolidacao.asc`),
       _sbFetchAll(`${SUPABASE_URL}/rest/v1/usuarios?select=*`),
     ]);
     if (!programacao.length) return;
@@ -1301,7 +1313,7 @@ async function carregarDadosSupabase() {
         ciclo: row.ciclo || '',
         ambiente: row.ambiente || '',
         ha: row.area_ha || 0,
-        sistConser: row.sist_conser || '',
+        sistConser: normalizaSistConser(row.sist_conser),
         mapeamento: row.mapeamento || 'Não',
         projeto: row.projeto || 'Pendente',
         blocoId: row.bloco_id || '',
@@ -1312,15 +1324,27 @@ async function carregarDadosSupabase() {
     FAZENDA_NAMES.length = 0;
     Object.keys(FAZENDAS).sort().forEach(n => FAZENDA_NAMES.push(n));
 
+    // Usuários de teste/diagnóstico (ex: "teste-diagnostico") não entram no
+    // gráfico "Ha por Usuário" — são execuções de validação, não trabalho real.
+    const USUARIO_TESTE_RE = /^teste[-_]?diagn/i;
     const ultimoPorLayer = new Map();
     for (const row of logs) ultimoPorLayer.set(String(row.layer), row.usuario);
     const novoUsuarioHa = {};
     for (const [layer, usuario] of ultimoPorLayer) {
-      if (!usuario) continue;
+      if (!usuario || USUARIO_TESTE_RE.test(usuario)) continue;
       novoUsuarioHa[usuario] = Math.round(((novoUsuarioHa[usuario] || 0) + (layerHa[layer] || 0)) * 100) / 100;
     }
     for (const k of Object.keys(USUARIOS_HA)) delete USUARIOS_HA[k];
     Object.assign(USUARIOS_HA, novoUsuarioHa);
+
+    // Data de entrega por layer: 1ª vez (ordem ascendente) que o log registrou Projeto='Ok'.
+    for (const k of Object.keys(DATA_ENTREGA_POR_LAYER)) delete DATA_ENTREGA_POR_LAYER[k];
+    for (const row of logs) {
+      const key = String(row.layer);
+      if (row.projeto === 'Ok' && !(key in DATA_ENTREGA_POR_LAYER)) {
+        DATA_ENTREGA_POR_LAYER[key] = row.data_consolidacao;
+      }
+    }
 
     if (usuarios.length) {
       USUARIOS_CONFIG.length = 0;
@@ -1346,6 +1370,9 @@ let currentBlocoId = null;
 let records        = [];   // log de alterações desta sessão (só para exibição em "Registros do dia")
 let _arquivosEsperados = [];
 let _arquivosSelecionados = [];
+// blocoId → JSON {mapeamento,projeto} do último registro salvo nesta sessão — evita
+// duplicar log_exportacoes ao clicar "Registrar" de novo sem ter mudado nada.
+let _blocoUltimoSalvo = {};
 
 // ── Init ──────────────────────────────────────────────────────────────────
 window.onload = async () => {
@@ -1375,21 +1402,47 @@ window.onload = async () => {
 const _hoje = new Date();
 const _anoAtual = _hoje.getFullYear(), _mesAtual = _hoje.getMonth();
 
-// Sist. Conser. que exige Mapeamento antes do Projeto poder avançar (ver SETUP.md).
-const SIST_CONSER_PRECISA_MAPEAMENTO = new Set(['EMBUTIDO', 'INTERCALADA', 'INTERCALADO']);
-function precisaMapeamento(sistConser) {
-  return SIST_CONSER_PRECISA_MAPEAMENTO.has((sistConser || '').toUpperCase());
+// Normaliza a grafia bagunçada de Sist. Conser. vinda da planilha de Preparo pra um
+// rótulo canônico único. Mantenha em sincronia com normaliza_sist_conser() em
+// engine/utils.py — não há como compartilhar código entre JS e Python aqui.
+function normalizaSistConser(raw) {
+  if (!raw) return '';
+  const s = String(raw).normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toUpperCase();
+  if (s === '' || s === '-' || s === 'SEM DADOS' || s === 'SEM DADO') return '';
+  if (s === 'BASE LARGA') return 'Base larga';
+  if (s === 'EMBUTIDO' || s === 'INTERCALADA' || s === 'INTERCALADO') return 'Embutido';
+  return s;
 }
 
-// Rollup de Sist. Conser. de um bloco: qualquer EMBUTIDO/INTERCALADA → bloco inteiro EMBUTIDO;
+// Sist. Conser. que exige Mapeamento antes do Projeto poder avançar (ver SETUP.md).
+// Base larga/vazio não precisam de mapeamento — Mapeamento já nasce/fica 'Sim'.
+const SIST_CONSER_PRECISA_MAPEAMENTO = new Set(['Embutido']);
+function precisaMapeamento(sistConser) {
+  return SIST_CONSER_PRECISA_MAPEAMENTO.has(sistConser);
+}
+
+// Tag (cor) usada para exibir o Sist. Conser.: Base larga = ciano, Embutido = laranja.
+function sistConserTagCls(sistConser) {
+  if (!sistConser) return 'muted';
+  if (sistConser === 'Embutido') return 'orange';
+  return 'cyan';
+}
+
+// Rollup de Sist. Conser. de um bloco: qualquer Embutido → bloco inteiro Embutido;
 // senão, vale o valor com mais ocorrências. '' (sem dado ainda) é tratado como "precisa atenção".
 function rollupSistConser(tals) {
-  const vals = tals.map(t => (t.sistConser || '').toUpperCase()).filter(Boolean);
+  const vals = tals.map(t => t.sistConser).filter(Boolean);
   if (!vals.length) return '';
-  if (vals.some(v => SIST_CONSER_PRECISA_MAPEAMENTO.has(v))) return 'EMBUTIDO';
+  if (vals.some(v => SIST_CONSER_PRECISA_MAPEAMENTO.has(v))) return 'Embutido';
   const counts = {};
   vals.forEach(v => counts[v] = (counts[v] || 0) + 1);
   return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+}
+
+// Mapeamento "efetivo" pra exibição: blocos/talhões que não precisam de mapeamento
+// (Base larga/vazio) sempre mostram 'Sim', independente do que está salvo no banco.
+function mapeamentoEfetivo(sistConser, mapeamentoRaw) {
+  return precisaMapeamento(sistConser) ? mapeamentoRaw : 'Sim';
 }
 
 // Cor do badge de Projeto — 'Aguard. Map.' fica 'muted' pra diferenciar visualmente
@@ -1547,14 +1600,13 @@ document.addEventListener('scroll',  () => closePlanCtxMenu(), true);
 const _filterMap = {
   a_fazer:  ['filterAFazer', 'active-blue'],
   mes_atual:['filterMes',    'active-green'],
-  '18m':    ['filter18m',    'active-red'],
 };
 
 function setFazFilter(type) {
   if (activeFilters.has(type)) activeFilters.delete(type);
   else activeFilters.add(type);
   Object.values(_filterMap).forEach(([id, cls]) =>
-    document.getElementById(id)?.classList.remove('active-blue','active-accent','active-green','active-red'));
+    document.getElementById(id)?.classList.remove('active-blue','active-accent','active-green'));
   activeFilters.forEach(f => {
     if (_filterMap[f]) document.getElementById(_filterMap[f][0])?.classList.add(_filterMap[f][1]);
   });
@@ -1573,7 +1625,6 @@ function filterFazendas(q) {
 
   if (activeFilters.has('a_fazer'))   names = names.filter(n => getFazStatus(n).status !== 'OK');
   if (activeFilters.has('mes_atual')) names = names.filter(n => Object.values(FAZENDAS[n].talhoes).some(t => isSelMonth(t)));
-  if (activeFilters.has('18m'))       names = names.filter(n => Object.values(FAZENDAS[n].talhoes).some(t => precisaMapeamento(t.sistConser)));
 
   currentNames = names;
   renderFazendas(currentNames);
@@ -1591,6 +1642,7 @@ function selectFazenda(name) {
   const badge = document.getElementById('fazSelectedBadge');
   badge.textContent = name;
   badge.style.display = 'block';
+  document.getElementById('btnClearFaz').style.display = 'inline-block';
 
   document.getElementById('placeholder').style.display = 'none';
   document.getElementById('formArea').style.display = 'block';
@@ -1602,6 +1654,19 @@ function selectFazenda(name) {
   document.getElementById('formCodTag').textContent = 'COD ' + d.cod;
 
   renderBlocos();
+}
+
+function clearFazendaSelection() {
+  currentFaz = null;
+  currentBlocoId = null;
+  sessionStorage.removeItem('gf_lastFaz');
+  document.getElementById('fazSelectedBadge').style.display = 'none';
+  document.getElementById('btnClearFaz').style.display = 'none';
+  document.getElementById('formArea').style.display = 'none';
+  document.getElementById('blocoPanel').style.display = 'none';
+  document.getElementById('placeholder').style.display = '';
+  document.getElementById('searchFaz').value = '';
+  renderFazendas(currentNames);
 }
 
 document.addEventListener('click', e => {
@@ -1618,15 +1683,18 @@ function getBlocos(name) {
     if (!grupos.has(key)) grupos.set(key, []);
     grupos.get(key).push({ tal: +tal, ...td });
   });
-  return [...grupos.entries()].map(([blocoId, tals]) => ({
-    blocoId, tals,
-    mesPlantio: tals[0].mesPlantio,
-    ambiente:   tals[0].ambiente,
-    ha:         tals.reduce((s, t) => s + (t.ha || 0), 0),
-    sistConser: rollupSistConser(tals),
-    mapeamento: tals[0].mapeamento,
-    projeto:    tals[0].projeto,
-  })).sort((a, b) => (a.mesPlantio || '9999').localeCompare(b.mesPlantio || '9999'));
+  return [...grupos.entries()].map(([blocoId, tals]) => {
+    const sistConser = rollupSistConser(tals);
+    return {
+      blocoId, tals,
+      mesPlantio: tals[0].mesPlantio,
+      ambiente:   tals[0].ambiente,
+      ha:         tals.reduce((s, t) => s + (t.ha || 0), 0),
+      sistConser,
+      mapeamento: mapeamentoEfetivo(sistConser, tals[0].mapeamento),
+      projeto:    tals[0].projeto,
+    };
+  }).sort((a, b) => (a.mesPlantio || '9999').localeCompare(b.mesPlantio || '9999'));
 }
 
 function fmtMesPlantio(iso) {
@@ -1639,7 +1707,7 @@ function renderBlocos() {
   const blocos = getBlocos(currentFaz);
   document.getElementById('blocosList').innerHTML = blocos.length ? blocos.map(b => {
     const cls   = projetoCls(b.projeto);
-    const scCls = !b.sistConser ? 'muted' : precisaMapeamento(b.sistConser) ? 'accent' : 'green';
+    const scCls = sistConserTagCls(b.sistConser);
     const talsTxt = b.tals.map(t => t.tal).sort((a, c) => a - c).join(', ');
     return `<div class="fazenda-item${b.blocoId === currentBlocoId ? ' active' : ''}"
                  style="background:var(--bg);border:1px solid var(--border);border-radius:8px"
@@ -1648,7 +1716,7 @@ function renderBlocos() {
         <div class="fazenda-name">${fmtMesPlantio(b.mesPlantio)}
           <span style="font-weight:400;color:var(--muted);font-size:12px">talhões ${talsTxt}</span></div>
         <div class="fazenda-meta" style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">
-          <span class="faz-tag faz-tag-${scCls}">${b.sistConser || 'SEM DADO'}</span>
+          <span class="faz-tag faz-tag-${scCls}">${b.sistConser || 'Sem dado'}</span>
           <span class="faz-tag faz-tag-muted">MAP: ${b.mapeamento.toUpperCase()}</span>
           <span class="faz-tag faz-tag-${cls}">${b.projeto.toUpperCase()}</span>
         </div>
@@ -1675,6 +1743,7 @@ function selectBloco(blocoId) {
     .sort((a, c) => a.tal - c.tal)
     .map(t => `<div class="tal-chip selected disabled">${t.tal}</div>`).join('');
 
+  _blocoSistConser = b.sistConser;
   _blocoMapeamento = b.mapeamento === 'Sim' ? 'Sim' : 'Não';
   document.getElementById('selProjeto').value = b.projeto || 'Pendente';
   atualizarMapeamentoBtns();
@@ -1682,9 +1751,13 @@ function selectBloco(blocoId) {
   updateSalvarBtn();
 }
 
+// Base larga/vazio não precisam de mapeamento — toggle fica travado em 'Sim'.
 function atualizarMapeamentoBtns() {
+  const bloqueado = !precisaMapeamento(_blocoSistConser);
   document.getElementById('btnMapNao').classList.toggle('active', _blocoMapeamento === 'Não');
   document.getElementById('btnMapSim').classList.toggle('active', _blocoMapeamento === 'Sim');
+  document.getElementById('btnMapNao').disabled = bloqueado;
+  document.getElementById('btnMapSim').disabled = bloqueado;
 }
 
 function setMapeamento(val) {
@@ -1694,7 +1767,7 @@ function setMapeamento(val) {
   updateSalvarBtn();
 }
 
-// EMBUTIDO/INTERCALADA exigem Mapeamento=Sim antes do Projeto avançar; sem Sist. Conser.
+// Embutido exige Mapeamento=Sim antes do Projeto avançar; sem Sist. Conser.
 // ainda registrado na base de preparo, também não dá pra avançar (situação ainda incerta).
 // Retorna o motivo do bloqueio ('aguardando_mapeamento' | 'sem_dado' | null = liberado).
 function motivoBloqueioProjeto(sistConser, mapeamento) {
@@ -1732,18 +1805,31 @@ function aplicarGatingProjeto(sistConser) {
 
 document.getElementById('selProjeto').onchange = updateSalvarBtn;
 
-// ── Salvar ────────────────────────────────────────────────────────────────
+// ── Registrar ─────────────────────────────────────────────────────────────
 function updateSalvarBtn() {
   const ok = !!(currentUser && currentFaz && currentBlocoId);
-  document.getElementById('btnSubmit').disabled = !ok;
-
   const info = document.getElementById('submitInfo');
-  if (!currentUser)        info.textContent = '⚠ selecione seu usuário';
-  else if (!currentBlocoId) info.textContent = 'selecione um bloco';
-  else {
-    const b = getBlocos(currentFaz).find(x => x.blocoId === currentBlocoId);
-    info.textContent = b ? `${b.tals.length} talhão(ões) — ${b.ha.toFixed(1)} ha` : '';
+
+  if (!ok) {
+    document.getElementById('btnSubmit').disabled = true;
+    if (!currentUser)         info.textContent = '⚠ selecione seu usuário';
+    else if (!currentBlocoId) info.textContent = 'selecione um bloco';
+    return;
   }
+
+  const b = getBlocos(currentFaz).find(x => x.blocoId === currentBlocoId);
+  if (!b) { document.getElementById('btnSubmit').disabled = true; info.textContent = ''; return; }
+
+  // Evita duplicar log_exportacoes: se Mapeamento/Projeto não mudaram desde o
+  // último registro desta sessão, o botão fica desabilitado até algo mudar.
+  const projeto = document.getElementById('selProjeto').value;
+  const atual = JSON.stringify({ mapeamento: _blocoMapeamento, projeto });
+  const jaRegistrado = _blocoUltimoSalvo[currentBlocoId] === atual;
+
+  document.getElementById('btnSubmit').disabled = jaRegistrado;
+  info.textContent = jaRegistrado
+    ? '✓ já registrado com esses valores'
+    : `${b.tals.length} talhão(ões) — ${b.ha.toFixed(1)} ha`;
 }
 
 async function salvarBloco() {
@@ -1790,16 +1876,17 @@ async function salvarBloco() {
       ha: b.ha, mapeamento, projeto,
     });
 
-    showToast(`Bloco salvo — ${b.tals.length} talhão(ões)`);
+    _blocoUltimoSalvo[currentBlocoId] = JSON.stringify({ mapeamento, projeto });
+
+    showToast(`Bloco registrado — ${b.tals.length} talhão(ões)`);
     renderLog();
     updateStats();
-    selectBloco(currentBlocoId);
+    selectBloco(currentBlocoId);   // reaplica gating e reavalia o botão (fica desabilitado — já registrado)
     renderFazendas(currentNames);
     renderPlano();
     if (document.getElementById('viewDashboard').style.display !== 'none') renderDashboard();
   } catch (e) {
-    showToast(`Erro ao salvar: ${e.message}`);
-  } finally {
+    showToast(`Erro ao registrar: ${e.message}`);
     btn.disabled = false;
   }
 }
@@ -2427,6 +2514,7 @@ function populateConsultaFilters() {
 }
 
 function limparFiltrosConsulta() {
+  document.getElementById('consultaSearch').value    = '';
   document.getElementById('cFiltroMes').value        = '';
   document.getElementById('cFiltroStatus').value     = '';
   document.getElementById('cFiltroSistConser').value = '';
@@ -2600,14 +2688,15 @@ function toggleFazDetail(name, rowEl, filtMesArg, filtScArg) {
   const talRows = sorted.map(t => {
     const td = allTals[t];
     const stCls = projetoCls(td.projeto);
+    const scCls = sistConserTagCls(td.sistConser);
     const _ym   = talYM(td);
     const data  = _ym ? _ym.split('-').reverse().join('/') : '—';
     return `<tr>
       <td style="font-family:monospace;font-weight:700">${t}</td>
-      <td>${td.sistConser || '—'}</td>
+      <td><span class="faz-tag faz-tag-${scCls}" style="font-size:10px">${td.sistConser || 'Sem dado'}</span></td>
       <td><span class="faz-tag faz-tag-${stCls}" style="font-size:10px">${td.projeto}</span></td>
       <td style="font-family:monospace">${(td.ha || 0).toFixed(1)} ha</td>
-      <td>${td.mapeamento || '—'}</td>
+      <td>${mapeamentoEfetivo(td.sistConser, td.mapeamento)}</td>
       <td style="font-family:monospace">${data}</td>
     </tr>`;
   }).join('');
@@ -2642,13 +2731,22 @@ function isTalDone(t) {
   return t.projeto === 'Ok';
 }
 
+// Entregue (Projeto='Ok') é "no prazo" se a 1ª vez que ficou Ok aconteceu até o
+// Mês de Plantio (deadline). Sem data de entrega/mês de plantio registrados,
+// não há como dizer que furou prazo — fica no balde "no prazo" (benefício da dúvida).
+function entregueNoPrazo(t) {
+  if (!t.mesPlantio) return true;
+  const dataEntrega = DATA_ENTREGA_POR_LAYER[String(t.layer)];
+  if (!dataEntrega) return true;
+  return dataEntrega.slice(0, 10) <= t.mesPlantio;
+}
+
 function computeDash() {
   let haTotal = 0, haConc = 0, haFazer = 0, haAndamento = 0;
   let fazConc = 0;
   let haMapTotal = 0, haMapConc = 0, haMapFazer = 0;
-  let haAtrasado = 0, haNoPrazo = 0;
+  let haEntregueNoPrazo = 0, haEntregueForaPrazo = 0;
   const byMonth = {};
-  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
 
   FAZENDA_NAMES.forEach(name => {
     const tals = Object.values(FAZENDAS[name].talhoes);
@@ -2659,12 +2757,11 @@ function computeDash() {
       const ha = t.ha || 0;
       haTotal += ha;
       if (t.projeto === 'Andamento') haAndamento += ha;
-      if (isTalDone(t))        haConc   += ha;
-      else                     haFazer  += ha;
-
-      if (!isTalDone(t)) {
-        const venceu = t.mesPlantio && new Date(t.mesPlantio) < hoje;
-        venceu ? haAtrasado += ha : haNoPrazo += ha;
+      if (isTalDone(t)) {
+        haConc += ha;
+        entregueNoPrazo(t) ? haEntregueNoPrazo += ha : haEntregueForaPrazo += ha;
+      } else {
+        haFazer += ha;
       }
 
       {
@@ -2688,7 +2785,7 @@ function computeDash() {
     pct: haTotal > 0 ? Math.round(haConc / haTotal * 100) : 0,
     byMonth,
     haMapTotal, haMapConc, haMapFazer,
-    haAtrasado, haNoPrazo
+    haEntregueNoPrazo, haEntregueForaPrazo
   };
 }
 
@@ -2709,11 +2806,10 @@ function renderDashboard() {
   // KPI cards
   const fmtHa = v => v.toLocaleString('pt-BR', {minimumFractionDigits:0, maximumFractionDigits:0});
   document.getElementById('dashKpiRow').innerHTML = [
-    { label: 'Total Fazendas', val: d.fazTotal.toLocaleString('pt-BR'), sub: `${d.fazConc} fazenda${d.fazConc!==1?'s':''} concluída${d.fazConc!==1?'s':''}`, cls: '' },
-    { label: 'Área Total',     val: fmtHa(d.haTotal), sub: 'hectares programados', cls: '' },
+    { label: 'Área Total',     val: fmtHa(d.haTotal), sub: `${d.fazTotal} fazenda${d.fazTotal!==1?'s':''}`, cls: '' },
     { label: 'Ha Concluído',   val: fmtHa(d.haConc),  sub: `${d.pct}% do total`, cls: 'green' },
     { label: 'Ha A Fazer',     val: fmtHa(d.haFazer), sub: 'hectares restantes', cls: 'blue' },
-    { label: 'Ha Andamento',   val: fmtHa(d.haAndamento), sub: 'projeto em andamento', cls: 'accent' },
+    { label: 'Ha Andamento',   val: fmtHa(d.haAndamento), sub: 'projeto em andamento', cls: 'yellow' },
   ].map(k => `<div class="dash-kpi-card${k.cls ? ' ' + k.cls : ''}">
     <div class="dash-kpi-label">${k.label}</div>
     <div class="dash-kpi-value">${k.val}</div>
@@ -2771,17 +2867,17 @@ function renderDashboard() {
     }
   });
 
-  // ── Situação de prazo (Atrasado = Mês de Plantio já passou e Projeto != Ok) ──
+  // ── Situação de prazo (entregue até o Mês de Plantio ou depois dele) ───────
   if (_chartPrazo) _chartPrazo.destroy();
   _chartPrazo = new Chart(document.getElementById('chartPrazo'), {
     type: 'bar',
     data: {
-      labels: ['Atrasado', 'No prazo', 'Concluído'],
+      labels: ['Entregue no prazo', 'Entregue fora do prazo'],
       datasets: [{
         label: 'Hectares',
-        data: [d.haAtrasado, d.haNoPrazo, d.haConc],
-        backgroundColor: [c.red + 'BB', c.blue + 'BB', c.green + 'BB'],
-        borderColor:     [c.red, c.blue, c.green],
+        data: [d.haEntregueNoPrazo, d.haEntregueForaPrazo],
+        backgroundColor: [c.green + 'BB', c.red + 'BB'],
+        borderColor:     [c.green, c.red],
         borderWidth: 1.5, borderRadius: 6, borderSkipped: false,
       }]
     },
@@ -2830,17 +2926,17 @@ function renderDashboard() {
     });
   }
 
-  // ── Talhões que precisam Mapeamento (EMBUTIDO/INTERCALADA) ────────────────
+  // ── Talhões Embutido — Mapeado / Falta Mapear ─────────────────────────────
   if (_chartMapeamento) _chartMapeamento.destroy();
   _chartMapeamento = new Chart(document.getElementById('chartMapeamento'), {
     type: 'bar',
     data: {
-      labels: ['Precisa Mapeamento', 'Mapeado', 'Falta Mapear'],
+      labels: ['Mapeado', 'Falta Mapear'],
       datasets: [{
         label: 'Hectares',
-        data: [d.haMapTotal, d.haMapConc, d.haMapFazer],
-        backgroundColor: [c.muted + '77', c.green + 'BB', c.blue + 'BB'],
-        borderColor:     [c.muted, c.green, c.blue],
+        data: [d.haMapConc, d.haMapFazer],
+        backgroundColor: [c.green + 'BB', c.blue + 'BB'],
+        borderColor:     [c.green, c.blue],
         borderWidth: 1.5, borderRadius: 6, borderSkipped: false,
       }]
     },
