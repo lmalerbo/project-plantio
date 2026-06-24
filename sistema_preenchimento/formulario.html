@@ -1238,6 +1238,14 @@
 </div>
 
 <script>
+// GitHub Pages serve todos os projetos de lmalerbo sob a mesma origem
+// (lmalerbo.github.io), e localStorage/sessionStorage são compartilhados por
+// origem — não por subpasta. Sem um prefixo próprio, chaves genéricas (herdadas
+// do sistema de Colheita/Programação de Frentes que deu origem a este formulário)
+// colidem com as desses outros sistemas (ex: o Plano da Semana sobrescrevendo
+// dados de outro app). Toda chave de local/sessionStorage deste arquivo usa LS().
+function LS(key) { return 'plantio_' + key; }
+
 // ── Servidor de consolidação ──────────────────────────────────────────────
 const SERVIDOR_URL = 'http://10.120.107.81:5678';
 
@@ -1362,8 +1370,8 @@ async function carregarDadosSupabase() {
 // Cada alteração de Mapeamento/Projeto é salva direto no Supabase (sem lote local
 // diário) — por isso não há mais risco de perda de dados não exportados, nem
 // necessidade de banner de pendências entre sessões.
-let currentUser = (localStorage.getItem('gf_user') || '').toLowerCase();
-if (currentUser) localStorage.setItem('gf_user', currentUser);
+let currentUser = (localStorage.getItem(LS('user')) || '').toLowerCase();
+if (currentUser) localStorage.setItem(LS('user'), currentUser);
 
 let currentFaz     = null;
 let currentBlocoId = null;
@@ -1394,7 +1402,7 @@ window.onload = async () => {
   renderPlano();
   renderDashboard();
   if (!currentUser) setTimeout(openUserModal, 400);
-  const lastFaz = sessionStorage.getItem('gf_lastFaz');
+  const lastFaz = sessionStorage.getItem(LS('lastFaz'));
   if (lastFaz && FAZENDAS[lastFaz]) selectFazenda(lastFaz);
 };
 
@@ -1635,7 +1643,7 @@ function filterFazendas(q) {
 function selectFazenda(name) {
   currentFaz = name;
   currentBlocoId = null;
-  sessionStorage.setItem('gf_lastFaz', name);
+  sessionStorage.setItem(LS('lastFaz'), name);
   document.getElementById('fazDropdown').classList.remove('open');
   document.getElementById('searchFaz').value = '';
 
@@ -1659,7 +1667,7 @@ function selectFazenda(name) {
 function clearFazendaSelection() {
   currentFaz = null;
   currentBlocoId = null;
-  sessionStorage.removeItem('gf_lastFaz');
+  sessionStorage.removeItem(LS('lastFaz'));
   document.getElementById('fazSelectedBadge').style.display = 'none';
   document.getElementById('btnClearFaz').style.display = 'none';
   document.getElementById('formArea').style.display = 'none';
@@ -1996,18 +2004,18 @@ function fecharConsolidar() {
 function abrirArquivosProjeto() {
   if (!currentFaz) return;
   const cod = String(FAZENDAS[currentFaz]?.cod ?? '');
-  _arquivosEsperados = [{suf:'Rev0',ext:'dwg'},{suf:'Exp0',ext:'zip'},{suf:'Rev0',ext:'pdf'}]
-    .map(({suf,ext}) => ({ cod, faz: currentFaz, suf, ext, nome: `${cod}_*_${suf}.${ext}`, ok: false, matched: null }));
+  _arquivosEsperados = [{suf:'Rev0',ext:'dwg'},{suf:'Exp0',ext:'zip'},{suf:'Rev0',ext:'pdf',opcional:true}]
+    .map(({suf,ext,opcional}) => ({ cod, faz: currentFaz, suf, ext, opcional: !!opcional, nome: `${cod}_*_${suf}.${ext}`, ok: false, matched: null }));
   _arquivosSelecionados = [];
 
   _abrirConsolidarModal(`Arquivos do projeto — ${currentFaz}`, `
     <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
-      Selecione os ${_arquivosEsperados.length} arquivo(s) correspondentes aos itens abaixo (pode selecionar vários de uma vez).
+      Selecione os arquivos correspondentes aos itens abaixo (pode selecionar vários de uma vez) — o mapa (PDF) é opcional.
       O nome deve seguir o padrão <code>{COD_FAZ}_{NOME}_{Rev0|Exp0}.{dwg|zip|pdf}</code> (separado por "_") —
       o nome da fazenda no meio pode variar, o sistema identifica pelo código e pelo sufixo.
     </div>
     <ul id="checklistArquivos" style="list-style:none;padding:0;margin:0 0 8px;font-size:11px;line-height:1.9">
-      ${_arquivosEsperados.map(a => `<li data-nome="${a.nome}">⬜ ${a.nome}</li>`).join('')}
+      ${_arquivosEsperados.map(a => `<li data-nome="${a.nome}">⬜ ${a.nome}${a.opcional ? ' <span style="color:var(--muted)">(opcional)</span>' : ''}</li>`).join('')}
     </ul>
     <input type="file" id="inputArquivosProjeto" accept=".dwg,.zip,.pdf" multiple onchange="_adicionarArquivoProjeto(this)">
     <button class="btn-modal-cancel" style="margin-left:8px" id="btnEnviarArquivos" onclick="enviarArquivosProjeto()" disabled>Enviar arquivos</button>
@@ -2066,11 +2074,12 @@ function _validarArquivosProjeto() {
     });
     item.ok = !!match;
     item.matched = match ? match.name : null;
-    if (!item.ok) todosOk = false;
+    if (!item.ok && !item.opcional) todosOk = false;
   }
   document.querySelectorAll('#checklistArquivos li').forEach(li => {
     const item = _arquivosEsperados.find(a => a.nome === li.dataset.nome);
-    li.innerHTML = `${item.ok ? '✅' : '⬜'} ${item.nome}` +
+    const tagOpcional = item.opcional ? ' <span style="color:var(--muted)">(opcional)</span>' : '';
+    li.innerHTML = `${item.ok ? '✅' : '⬜'} ${item.nome}${tagOpcional}` +
       (item.matched ? ` <span style="color:var(--muted)">→ ${item.matched}</span>` : '');
     li.style.color = item.ok ? 'var(--green)' : '';
   });
@@ -2125,7 +2134,7 @@ async function enviarArquivosProjeto() {
 // Config local (espelho editável em sessão; fonte da verdade = USUARIOS_CONFIG injetado pelo Python)
 let adminConfig = USUARIOS_CONFIG.length
   ? USUARIOS_CONFIG.map(u => ({ nome: u.nome.toLowerCase(), perfis: u.perfis || ['preenchimento','dashboard'] }))
-  : JSON.parse(localStorage.getItem('gf_users_config') || '[]');
+  : JSON.parse(localStorage.getItem(LS('users_config')) || '[]');
 
 function getUserPerfis(nome) {
   if (!adminConfig.length) return ['preenchimento', 'dashboard'];
@@ -2136,7 +2145,7 @@ function getUserPerfis(nome) {
 function getSelectableUsers() {
   return adminConfig.length
     ? adminConfig.map(u => u.nome)
-    : (JSON.parse(localStorage.getItem('gf_users') || '[]').map(u => u.toLowerCase()));
+    : (JSON.parse(localStorage.getItem(LS('users')) || '[]').map(u => u.toLowerCase()));
 }
 
 function applyUserPermissions(nome) {
@@ -2181,7 +2190,7 @@ function renderUserChips() {
 function selectUserChip(name) {
   closeUserModal();
   currentUser = name;
-  localStorage.setItem('gf_user', name);
+  localStorage.setItem(LS('user'), name);
   updateUserBadge();
   updateSalvarBtn();
   applyUserPermissions(name);
@@ -2249,7 +2258,7 @@ function adminTogglePerfil(idx, perfil, checked) {
     adminConfig[idx].perfis.push(perfil);
   else if (!checked)
     adminConfig[idx].perfis = adminConfig[idx].perfis.filter(p => p !== perfil);
-  localStorage.setItem('gf_users_config', JSON.stringify(adminConfig));
+  localStorage.setItem(LS('users_config'), JSON.stringify(adminConfig));
   if (adminConfig[idx].nome === currentUser) applyUserPermissions(currentUser);
 }
 
@@ -2257,7 +2266,7 @@ function adminRemoveUser(idx) {
   const nome = adminConfig[idx].nome;
   if (!confirm(`Remover usuário "${nome}"?`)) return;
   adminConfig.splice(idx, 1);
-  localStorage.setItem('gf_users_config', JSON.stringify(adminConfig));
+  localStorage.setItem(LS('users_config'), JSON.stringify(adminConfig));
   renderAdminList();
 }
 
@@ -2272,7 +2281,7 @@ function adminAddUser() {
   if (document.getElementById('chkDashboard').checked)     perfis.push('dashboard');
   if (!perfis.length) { alert('Selecione pelo menos um perfil.'); return; }
   adminConfig.push({ nome, perfis });
-  localStorage.setItem('gf_users_config', JSON.stringify(adminConfig));
+  localStorage.setItem(LS('users_config'), JSON.stringify(adminConfig));
   document.getElementById('inputAdminUser').value = '';
   renderAdminList();
 }
@@ -2333,8 +2342,8 @@ function _getWeekKey() {
   monday.setDate(d.getDate() + toMonday);
   return monday.toISOString().slice(0, 10);
 }
-const planKey     = 'gf_plan_'      + _getWeekKey();
-const planDoneKey = 'gf_plan_done_' + _getWeekKey();
+const planKey     = LS('plan_'      + _getWeekKey());
+const planDoneKey = LS('plan_done_' + _getWeekKey());
 
 let planFazendas = [];
 try { planFazendas = JSON.parse(localStorage.getItem(planKey) || '[]'); } catch(e) { planFazendas = []; }
@@ -2961,12 +2970,12 @@ function toggleTheme() {
   const isDark = html.getAttribute('data-theme') === 'dark';
   const next = isDark ? 'light' : 'dark';
   html.setAttribute('data-theme', next);
-  localStorage.setItem('gf_theme', next);
+  localStorage.setItem(LS('theme'), next);
   document.getElementById('themeToggle').innerHTML = next === 'dark' ? '&#9790;' : '&#9788;';
   if (document.getElementById('viewDashboard').style.display !== 'none') renderDashboard();
 }
 (function() {
-  const saved = localStorage.getItem('gf_theme') || 'dark';
+  const saved = localStorage.getItem(LS('theme')) || 'dark';
   document.documentElement.setAttribute('data-theme', saved);
   const btn = document.getElementById('themeToggle');
   if (btn) btn.innerHTML = saved === 'dark' ? '&#9790;' : '&#9788;';
