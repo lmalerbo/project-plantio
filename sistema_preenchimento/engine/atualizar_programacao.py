@@ -28,7 +28,7 @@ _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _BASE_DIR   = os.path.dirname(_SCRIPT_DIR)   # sistema_preenchimento/
 sys.path.insert(0, _SCRIPT_DIR)
 from utils import (layer_to_str, norm_header, parse_talhoes, redirecionar_stdout, fechar_log,
-                    achar_header, data_para_iso)
+                    achar_header, data_para_iso, rollup_sist_conser, SIST_CONSER_PRECISA_MAPEAMENTO)
 
 _log_fh = redirecionar_stdout(os.path.join(_BASE_DIR, 'logs', 'atualizar.log'))
 
@@ -289,14 +289,38 @@ if sem_area:
 if sem_sist_conser:
     print(f"  ⚠  {sem_sist_conser} talhão(ões) ainda sem registro na base de preparo (sist_conser = '', preparo provavelmente não chegou na etapa de conservação).")
 
+# ── Status inicial do Projeto, por bloco (mesma regra do formulario.html) ──
+# 'Aguard. Map.' quando o rollup do bloco precisa de mapeamento e o Mapeamento
+# ainda não é 'Sim'; senão 'Pendente'. Só corrige layers que ainda estão numa
+# dessas duas situações "não iniciadas" — nunca sobrescreve Andamento/Ok.
+_bloco_sist_conser = {}
+for rec in por_layer.values():
+    _bloco_sist_conser.setdefault(rec['bloco_id'], []).append(rec['sist_conser'])
+_bloco_rollup = {bid: rollup_sist_conser(vals) for bid, vals in _bloco_sist_conser.items()}
+
+
+def _status_inicial(bloco_id, mapeamento):
+    sc = _bloco_rollup.get(bloco_id, '')
+    if sc in SIST_CONSER_PRECISA_MAPEAMENTO and mapeamento != 'Sim':
+        return 'Aguard. Map.'
+    return 'Pendente'
+
+
 novos = 0
+corrigidos = 0
 prog_rows = []
 for layer_val, rec in por_layer.items():
     ly_str = layer_to_str(layer_val)
     if ly_str in preserved:
         mapeamento, projeto = preserved[ly_str]
+        if projeto in ('Pendente', 'Aguard. Map.'):
+            novo_projeto = _status_inicial(rec['bloco_id'], mapeamento)
+            if novo_projeto != projeto:
+                corrigidos += 1
+            projeto = novo_projeto
     else:
-        mapeamento, projeto = 'Não', 'Pendente'
+        mapeamento = 'Não'
+        projeto = _status_inicial(rec['bloco_id'], mapeamento)
         novos += 1
     prog_rows.append(dict(rec, mapeamento=mapeamento, projeto=projeto))
 
@@ -313,7 +337,7 @@ for i in range(0, len(prog_rows), BATCH):
         sys.exit(1)
     print(f"  {min(i+BATCH, len(prog_rows))}/{len(prog_rows)}")
 
-print(f"\n  Upsert concluído. Novas linhas: {novos}\n")
+print(f"\n  Upsert concluído. Novas linhas: {novos}. Status corrigido (Pendente ⇄ Aguard. Map.): {corrigidos}.\n")
 
 # ── Aviso: LAYERs com preenchimento removidos desta atualização ───────────
 layers_novos_str = {layer_to_str(r['layer']) for r in prog_rows}

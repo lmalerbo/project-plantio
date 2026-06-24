@@ -499,9 +499,10 @@
     font-size: 10px; font-weight: 700;
     text-transform: uppercase; letter-spacing: 0.5px;
   }
-  .status-Ok        { background: rgba(76,175,114,.15);  color: var(--green);  }
-  .status-Andamento { background: rgba(200,150,12,.15);  color: var(--accent); }
-  .status-Pendente  { background: rgba(90,159,212,.15);  color: var(--blue);   }
+  .status-green  { background: rgba(76,175,114,.15);  color: var(--green);  }
+  .status-accent { background: rgba(200,150,12,.15);  color: var(--accent); }
+  .status-blue   { background: rgba(90,159,212,.15);  color: var(--blue);   }
+  .status-muted  { background: rgba(122,136,117,.15); color: var(--muted); }
 
   .btn-edit, .btn-del {
     background: none; border: none;
@@ -1076,6 +1077,7 @@
               <div class="field-group">
                 <label>Projeto</label>
                 <select id="selProjeto">
+                  <option value="Aguard. Map.">Aguard. Map.</option>
                   <option value="Pendente">Pendente</option>
                   <option value="Andamento">Andamento</option>
                   <option value="Ok">Ok</option>
@@ -1134,6 +1136,9 @@
         <option value="PENDENTE">Pendente</option>
         <option value="ANDAMENTO">Andamento</option>
         <option value="OK">Ok</option>
+      </select>
+      <select id="cFiltroSistConser" class="mes-filter-select" onchange="renderConsulta()">
+        <option value="">— todos os Sist. Conser. —</option>
       </select>
       <button class="faz-filter-btn" id="btnConsultaSel" onclick="toggleConsultaSelectMode()">&#9744; Selecionar</button>
       <button class="faz-filter-btn" onclick="limparFiltrosConsulta()">Limpar</button>
@@ -1387,6 +1392,15 @@ function rollupSistConser(tals) {
   return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
 }
 
+// Cor do badge de Projeto — 'Aguard. Map.' fica 'muted' pra diferenciar visualmente
+// de 'Pendente' (já liberado pra começar) mesmo os dois ainda não terem ha concluído.
+function projetoCls(projeto) {
+  if (projeto === 'Ok') return 'green';
+  if (projeto === 'Andamento') return 'accent';
+  if (projeto === 'Aguard. Map.') return 'muted';
+  return 'blue';
+}
+
 // Retorna "YYYY-MM" de um talhão a partir do Mês de Plantio (data real, sem aproximação de ano).
 function talYM(t) {
   return t.mesPlantio ? t.mesPlantio.slice(0, 7) : null;
@@ -1624,7 +1638,7 @@ function fmtMesPlantio(iso) {
 function renderBlocos() {
   const blocos = getBlocos(currentFaz);
   document.getElementById('blocosList').innerHTML = blocos.length ? blocos.map(b => {
-    const cls   = b.projeto === 'Ok' ? 'green' : b.projeto === 'Andamento' ? 'accent' : 'blue';
+    const cls   = projetoCls(b.projeto);
     const scCls = !b.sistConser ? 'muted' : precisaMapeamento(b.sistConser) ? 'accent' : 'green';
     const talsTxt = b.tals.map(t => t.tal).sort((a, c) => a - c).join(', ');
     return `<div class="fazenda-item${b.blocoId === currentBlocoId ? ' active' : ''}"
@@ -1682,25 +1696,35 @@ function setMapeamento(val) {
 
 // EMBUTIDO/INTERCALADA exigem Mapeamento=Sim antes do Projeto avançar; sem Sist. Conser.
 // ainda registrado na base de preparo, também não dá pra avançar (situação ainda incerta).
-function bloqueiaProjeto(sistConser, mapeamento) {
-  if (!sistConser) return true;
-  if (precisaMapeamento(sistConser)) return mapeamento !== 'Sim';
-  return false;
+// Retorna o motivo do bloqueio ('aguardando_mapeamento' | 'sem_dado' | null = liberado).
+function motivoBloqueioProjeto(sistConser, mapeamento) {
+  if (!sistConser) return 'sem_dado';
+  if (precisaMapeamento(sistConser) && mapeamento !== 'Sim') return 'aguardando_mapeamento';
+  return null;
 }
 
 function aplicarGatingProjeto(sistConser) {
   _blocoSistConser = sistConser;
-  const bloqueado = bloqueiaProjeto(sistConser, _blocoMapeamento);
+  const motivo = motivoBloqueioProjeto(sistConser, _blocoMapeamento);
   const sel = document.getElementById('selProjeto');
-  [...sel.options].forEach(opt => { opt.disabled = bloqueado && opt.value !== 'Pendente'; });
-  if (bloqueado && sel.value !== 'Pendente') sel.value = 'Pendente';
+
+  if (motivo === 'aguardando_mapeamento') {
+    [...sel.options].forEach(opt => { opt.disabled = opt.value !== 'Aguard. Map.'; });
+    if (sel.value !== 'Aguard. Map.') sel.value = 'Aguard. Map.';
+  } else if (motivo === 'sem_dado') {
+    [...sel.options].forEach(opt => { opt.disabled = opt.value !== 'Pendente'; });
+    if (sel.value !== 'Pendente') sel.value = 'Pendente';
+  } else {
+    [...sel.options].forEach(opt => { opt.disabled = opt.value === 'Aguard. Map.'; });
+    if (sel.value === 'Aguard. Map.') sel.value = 'Pendente';
+  }
 
   const info = document.getElementById('gatingInfo');
-  if (!bloqueado) {
+  if (!motivo) {
     info.style.display = 'none';
   } else {
     info.style.display = '';
-    info.textContent = sistConser
+    info.textContent = motivo === 'aguardando_mapeamento'
       ? '⚠ Sist. Conser. exige Mapeamento = Sim antes do Projeto poder avançar.'
       : '⚠ Ainda sem Sist. Conser. da base de preparo — Projeto fica em Pendente até essa informação chegar.';
   }
@@ -1799,7 +1823,7 @@ function renderLog() {
       <td style="font-family:monospace">${r.talhoes}</td>
       <td style="font-family:monospace">${(r.ha||0).toFixed(1)} ha</td>
       <td>${r.mapeamento}</td>
-      <td><span class="status-pill status-${r.projeto}">${r.projeto}</span></td>
+      <td><span class="status-pill status-${projetoCls(r.projeto)}">${r.projeto}</span></td>
     </tr>`).join('');
 
   content.innerHTML = `<table>
@@ -2377,11 +2401,12 @@ function debouncedRenderConsulta() {
   _consultaDebounceTimer = setTimeout(renderConsulta, 200);
 }
 function populateConsultaFilters() {
-  const meses = new Set();
+  const meses = new Set(), sistConsers = new Set();
   FAZENDA_NAMES.forEach(n => {
     Object.values(FAZENDAS[n].talhoes).forEach(t => {
       const ym = talYM(t);
       if (ym) meses.add(ym);
+      sistConsers.add(t.sistConser || 'SEM_DADO');
     });
   });
   const selMes = document.getElementById('cFiltroMes');
@@ -2393,11 +2418,18 @@ function populateConsultaFilters() {
       return `<option value="${ym}">${nome.charAt(0).toUpperCase() + nome.slice(1)}</option>`;
     }).join('');
   selMes.value = curMes;
+
+  const selSc = document.getElementById('cFiltroSistConser');
+  const curSc = selSc.value;
+  selSc.innerHTML = '<option value="">— todos os Sist. Conser. —</option>' +
+    [...sistConsers].sort().map(sc => `<option value="${sc}">${sc === 'SEM_DADO' ? 'Sem dado' : sc}</option>`).join('');
+  selSc.value = curSc;
 }
 
 function limparFiltrosConsulta() {
-  document.getElementById('cFiltroMes').value      = '';
-  document.getElementById('cFiltroStatus').value   = '';
+  document.getElementById('cFiltroMes').value        = '';
+  document.getElementById('cFiltroStatus').value     = '';
+  document.getElementById('cFiltroSistConser').value = '';
   renderConsulta();
 }
 
@@ -2458,9 +2490,12 @@ function renderConsulta(page) {
   const q           = (document.getElementById('consultaSearch')?.value || '').toLowerCase();
   const filtMes     = document.getElementById('cFiltroMes')?.value      || '';
   const filtStatus  = document.getElementById('cFiltroStatus')?.value   || '';
+  const filtSc      = document.getElementById('cFiltroSistConser')?.value || '';
+  const matchSc = t => !filtSc || (t.sistConser || 'SEM_DADO') === filtSc;
 
   document.getElementById('cFiltroMes').classList.toggle('active', !!filtMes);
   document.getElementById('cFiltroStatus').classList.toggle('active', !!filtStatus);
+  document.getElementById('cFiltroSistConser').classList.toggle('active', !!filtSc);
 
   let names = q
     ? FAZENDA_NAMES.filter(n => n.toLowerCase().includes(q) || String(FAZENDAS[n].cod).includes(q))
@@ -2468,6 +2503,8 @@ function renderConsulta(page) {
 
   if (filtMes) names = names.filter(n =>
     Object.values(FAZENDAS[n].talhoes).some(t => talYM(t) === filtMes));
+  if (filtSc) names = names.filter(n =>
+    Object.values(FAZENDAS[n].talhoes).some(matchSc));
   if (filtStatus) names = names.filter(n => getFazStatus(n).status === filtStatus);
 
   _consultaNames = names;
@@ -2488,7 +2525,7 @@ function renderConsulta(page) {
   const rows = pageNames.map(name => {
     const d = FAZENDAS[name];
     const allTals = Object.values(d.talhoes);
-    const tals = allTals.filter(t => !filtMes || talYM(t) === filtMes);
+    const tals = allTals.filter(t => (!filtMes || talYM(t) === filtMes) && matchSc(t));
     const totalTals = tals.length;
     const conc  = tals.filter(isTalDone).length;
     const { status, cls, ciclo } = getFazStatus(name);
@@ -2497,7 +2534,7 @@ function renderConsulta(page) {
     const cbTd = _consultaSelectMode
       ? `<td class="consulta-cb" onclick="event.stopPropagation()"><input type="checkbox" ${_consultaSelected.has(name) ? 'checked' : ''} onclick="toggleConsultaSel('${escName}',this)"></td>`
       : '';
-    return `<tr class="consulta-faz-row${_consultaSelected.has(name) ? ' selected' : ''}" onclick="toggleFazDetail('${escName}',this,'${filtMes}')" oncontextmenu="openCtxMenu(event,'${escName}')" id="cfr-${CSS.escape(name)}">
+    return `<tr class="consulta-faz-row${_consultaSelected.has(name) ? ' selected' : ''}" onclick="toggleFazDetail('${escName}',this,'${filtMes}','${filtSc}')" oncontextmenu="openCtxMenu(event,'${escName}')" id="cfr-${CSS.escape(name)}">
       ${cbTd}
       <td><span class="consulta-expand-icon" id="cfi-${CSS.escape(name)}">▶</span><strong>${name}</strong></td>
       <td style="font-family:monospace">${d.cod}</td>
@@ -2533,7 +2570,7 @@ function renderConsulta(page) {
   </div>`;
 }
 
-function toggleFazDetail(name, rowEl, filtMesArg) {
+function toggleFazDetail(name, rowEl, filtMesArg, filtScArg) {
   const esc = CSS.escape(name);
   const detailRow = document.getElementById('cdr-' + esc);
   const inner     = document.getElementById('cdinner-' + esc);
@@ -2557,11 +2594,12 @@ function toggleFazDetail(name, rowEl, filtMesArg) {
   const allTals = FAZENDAS[name].talhoes;
   const sorted = Object.keys(allTals).sort((a, b) => +a - +b).filter(t => {
     const td = allTals[t];
-    return !filtMesArg || talYM(td) === filtMesArg;
+    return (!filtMesArg || talYM(td) === filtMesArg) &&
+           (!filtScArg  || (td.sistConser || 'SEM_DADO') === filtScArg);
   });
   const talRows = sorted.map(t => {
     const td = allTals[t];
-    const stCls = td.projeto === 'Ok' ? 'green' : td.projeto === 'Andamento' ? 'accent' : 'blue';
+    const stCls = projetoCls(td.projeto);
     const _ym   = talYM(td);
     const data  = _ym ? _ym.split('-').reverse().join('/') : '—';
     return `<tr>
