@@ -499,9 +499,9 @@
     font-size: 10px; font-weight: 700;
     text-transform: uppercase; letter-spacing: 0.5px;
   }
-  .status-CONCLUIDO   { background: rgba(76,175,114,.15); color: var(--green); }
-  .status-A\ FAZER    { background: rgba(200,150,12,.15); color: var(--accent); }
-  .status-SEM\ LINHAS { background: rgba(122,136,117,.15); color: var(--muted); }
+  .status-Ok        { background: rgba(76,175,114,.15);  color: var(--green);  }
+  .status-Andamento { background: rgba(200,150,12,.15);  color: var(--accent); }
+  .status-Pendente  { background: rgba(90,159,212,.15);  color: var(--blue);   }
 
   .btn-edit, .btn-del {
     background: none; border: none;
@@ -937,29 +937,29 @@
       <span class="dash-progress-pct" id="dashProgressPct">0%</span>
     </div>
 
-    <!-- Linha: Ha por Mês + Ha por Frente -->
+    <!-- Linha: Ha por Mês + Ha por Ambiente -->
     <div class="dash-charts-flex">
       <div class="dash-chart-card">
-        <div class="dash-chart-title">Ha Programado por Mês</div>
+        <div class="dash-chart-title">Ha Programado por Mês de Plantio</div>
         <canvas id="chartMes" height="220"></canvas>
       </div>
       <div class="dash-chart-card" style="overflow:hidden; min-width:0; display:flex; flex-direction:column">
-        <div class="dash-chart-title">Ha por Frente</div>
-        <div id="chartFrenteWrap" style="position:relative; width:100%; flex:1; min-height:180px">
-          <canvas id="chartFrente"></canvas>
+        <div class="dash-chart-title">Ha por Ambiente</div>
+        <div id="chartAmbienteWrap" style="position:relative; width:100%; flex:1; min-height:180px">
+          <canvas id="chartAmbiente"></canvas>
         </div>
       </div>
     </div>
 
-    <!-- Linha: Ha por Usuário + Talhões 18m -->
+    <!-- Linha: Ha por Usuário + Talhões que precisam Mapeamento -->
     <div class="dash-charts-flex">
       <div class="dash-chart-card" id="chartUsuarioCard" style="display:none">
         <div class="dash-chart-title">Ha por Usuário — Log de Exportações</div>
         <canvas id="chartUsuario" height="200"></canvas>
       </div>
       <div class="dash-chart-card">
-        <div class="dash-chart-title">Talhões 18m — Total / Concluído / A Fazer</div>
-        <canvas id="chart18m" height="200"></canvas>
+        <div class="dash-chart-title">Talhões Embutido/Intercalada — Total / Mapeado / Falta Mapear</div>
+        <canvas id="chartMapeamento" height="200"></canvas>
       </div>
     </div>
 
@@ -988,9 +988,6 @@
     </div>
   </aside>
   <div class="main" id="mainArea">
-
-    <!-- Banner registros pendentes -->
-    <div id="bannerPendente" style="display:none"></div>
 
     <!-- Cards de resumo -->
     <div class="stats-row">
@@ -1036,7 +1033,7 @@
         <span class="faz-filter-label">Filtro:</span>
         <button class="faz-filter-btn" id="filterAFazer" onclick="setFazFilter('a_fazer')">A Fazer</button>
         <button class="faz-filter-btn" id="filterMes" onclick="setFazFilter('mes_atual')">Mês</button><select id="mesFilter" class="mes-filter-select" onchange="onMesFilterChange()"></select>
-        <button class="faz-filter-btn" id="filter18m"   onclick="setFazFilter('18m')">18m</button>
+        <button class="faz-filter-btn" id="filter18m"   onclick="setFazFilter('18m')">Precisa Mapeamento</button>
       </div>
     </div>
 
@@ -1051,66 +1048,54 @@
         <div class="form-card-header">
           <div class="form-card-title">
             <span id="formFazTitle">—</span>
-            <span class="frente-tag" id="formFrenteTag">—</span>
+            <span class="frente-tag" id="formBlocoTag">—</span>
           </div>
           <div style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace" id="formCodTag">—</div>
         </div>
         <div class="form-card-body">
 
-          <!-- Cobertura -->
-          <div class="cob-toggle">
-            <button class="cob-btn active" id="btnInteira" onclick="setCobertura('inteira')">Fazenda Inteira</button>
-            <button class="cob-btn" id="btnParcial" onclick="setCobertura('parcial')">Parcial</button>
+          <!-- Blocos da fazenda (cada bloco = grupo de talhões da Sequência de Plantio) -->
+          <div class="talhoes-section">
+            <div class="talhoes-label"><span>Blocos</span></div>
+            <div id="blocosList" style="display:flex;flex-direction:column;gap:8px"></div>
           </div>
 
-          <!-- Talhões -->
-          <div class="talhoes-section">
-            <div class="talhoes-label">
-              <span>Talhões <span id="talSel" style="color:var(--accent)"></span></span>
-              <div class="talhoes-actions" id="talActions" style="display:none">
-                <button class="link-btn" onclick="select18mTal()" style="color:var(--red)">18m</button>
-                <button class="link-btn" onclick="selectAllTal()">todos</button>
-                <button class="link-btn" onclick="selectRestantesTal()">restantes</button>
-                <button class="link-btn" onclick="clearAllTal()">limpar</button>
+          <!-- Painel do bloco selecionado -->
+          <div id="blocoPanel" style="display:none">
+            <div class="talhoes-section">
+              <div class="talhoes-label"><span>Talhões do bloco</span></div>
+              <div class="talhoes-grid" id="talhoesGrid"></div>
+            </div>
+
+            <div class="fields-row">
+              <div class="field-group">
+                <label>Mapeamento</label>
+                <div class="cob-toggle">
+                  <button class="cob-btn" id="btnMapNao" onclick="setMapeamento('Não')">Não</button>
+                  <button class="cob-btn" id="btnMapSim" onclick="setMapeamento('Sim')">Sim</button>
+                </div>
+              </div>
+              <div class="field-group">
+                <label>Projeto</label>
+                <select id="selProjeto">
+                  <option value="Pendente">Pendente</option>
+                  <option value="Andamento">Andamento</option>
+                  <option value="Ok">Ok</option>
+                </select>
               </div>
             </div>
-            <div class="talhoes-grid" id="talhoesGrid"></div>
-          </div>
+            <div id="gatingInfo" style="display:none;font-size:11px;color:var(--accent);margin-bottom:10px">
+              ⚠ Sist. Conser. exige Mapeamento = Sim antes do Projeto poder avançar.
+            </div>
 
-          <!-- Campos -->
-          <div class="fields-row">
-            <div class="field-group">
-              <label>Tipo de Linha</label>
-              <select id="selTipo">
-                <option value="">— selecione —</option>
-                <option value="VANT">Linha de Vant</option>
-                <option value="PROJETO">Desdobra de Plantio</option>
-                <option value="SEM LINHAS">Sem Linhas</option>
-              </select>
+            <!-- Submit -->
+            <div class="submit-row">
+              <div class="submit-info" id="submitInfo">selecione um bloco</div>
+              <div style="display:flex;gap:8px">
+                <button class="btn-modal-cancel" onclick="abrirArquivosProjeto()">📎 Arquivos do projeto</button>
+                <button class="btn-submit" id="btnSubmit" onclick="salvarBloco()" disabled>Salvar →</button>
+              </div>
             </div>
-            <div class="field-group">
-              <label>Ciclo</label>
-              <select id="selCiclo">
-                <option value="">— selecione —</option>
-                <option value="25-26">25-26</option>
-                <option value="26-27">26-27</option>
-              </select>
-            </div>
-            <div class="field-group">
-              <label>Status</label>
-              <select id="selStatus">
-                <option value="">— selecione —</option>
-                <option value="CONCLUIDO">Concluído</option>
-                <option value="A FAZER">A Fazer</option>
-                <option value="SEM LINHAS">Sem Linhas</option>
-              </select>
-            </div>
-          </div>
-
-          <!-- Submit -->
-          <div class="submit-row">
-            <div class="submit-info" id="submitInfo">selecione os campos acima</div>
-            <button class="btn-submit" id="btnSubmit" onclick="registrar()" disabled>Registrar →</button>
           </div>
 
         </div>
@@ -1127,17 +1112,6 @@
 
   </div>
 </div>
-</div>
-
-<!-- Export bar (só na tela de preenchimento) -->
-<div class="export-bar" id="exportBar" style="display:none">
-  <div style="display:flex;align-items:center;gap:10px">
-    <div class="export-info" id="exportInfo">0 registros</div>
-    <button class="btn-clear" id="btnClear" onclick="limparRegistros()" style="display:none">&#128465; Limpar</button>
-  </div>
-  <div style="display:flex;align-items:center;gap:6px">
-    <button class="btn-export" id="btnExport" onclick="consolidar()" disabled>Consolidar</button>
-  </div>
 </div>
 
 <!-- ══ Tela 3: Consulta ════════════════════════════════════════════════════ -->
@@ -1157,13 +1131,14 @@
       <select id="cFiltroMes" class="mes-filter-select" onchange="renderConsulta()">
         <option value="">— todos os meses —</option>
       </select>
-      <select id="cFiltroFrente" class="mes-filter-select" onchange="renderConsulta()">
-        <option value="">— todas as frentes —</option>
+      <select id="cFiltroAmbiente" class="mes-filter-select" onchange="renderConsulta()">
+        <option value="">— todos os ambientes —</option>
       </select>
       <select id="cFiltroStatus" class="mes-filter-select" onchange="renderConsulta()">
         <option value="">— todos os status —</option>
-        <option value="A FAZER">A Fazer</option>
-        <option value="CONCLUÍDO">Concluído</option>
+        <option value="PENDENTE">Pendente</option>
+        <option value="ANDAMENTO">Andamento</option>
+        <option value="OK">Ok</option>
       </select>
       <button class="faz-filter-btn" id="btnConsultaSel" onclick="toggleConsultaSelectMode()">&#9744; Selecionar</button>
       <button class="faz-filter-btn" onclick="limparFiltrosConsulta()">Limpar</button>
@@ -1192,55 +1167,8 @@
   <div class="ctx-menu-item" style="color:var(--red)" onclick="planCtxRemover()">&#10005; Remover do plano</div>
 </div>
 
-<!-- Clear Confirm Modal -->
-<div class="modal-overlay" id="clearConfirmOverlay" onclick="if(event.target===this)closeClearConfirm()">
-  <div class="modal" style="max-width:360px">
-    <h3 style="color:var(--red)">Limpar registros</h3>
-    <p class="clear-confirm-body" id="clearConfirmMsg"></p>
-    <p class="clear-confirm-warn">&#9888;&#65039; Esta ação não pode ser desfeita.</p>
-    <div style="display:flex;gap:10px;justify-content:flex-end">
-      <button class="btn-modal-cancel" onclick="closeClearConfirm()">Cancelar</button>
-      <button class="btn-modal-ok" id="btnConfirmLimpar" onclick="confirmLimpar()" style="background:var(--red)">Limpar tudo</button>
-    </div>
-  </div>
-</div>
-
 <!-- Toast -->
 <div class="toast" id="toast"></div>
-
-<!-- Modal Edição -->
-<div class="modal-overlay" id="editOverlay">
-  <div class="modal">
-    <h3>Editar Registro</h3>
-    <div class="modal-field">
-      <label>Tipo de Linha</label>
-      <select id="editTipo">
-        <option value="VANT">Linha de Vant</option>
-        <option value="PROJETO">Desdobra de Plantio</option>
-        <option value="SEM LINHAS">Sem Linhas</option>
-      </select>
-    </div>
-    <div class="modal-field">
-      <label>Ciclo</label>
-      <select id="editCiclo">
-        <option value="25-26">25-26</option>
-        <option value="26-27">26-27</option>
-      </select>
-    </div>
-    <div class="modal-field">
-      <label>Status</label>
-      <select id="editStatus">
-        <option value="CONCLUIDO">Concluído</option>
-        <option value="A FAZER">A Fazer</option>
-        <option value="SEM LINHAS">Sem Linhas</option>
-      </select>
-    </div>
-    <div class="modal-actions">
-      <button class="btn-modal-cancel" onclick="closeEditModal()">Cancelar</button>
-      <button class="btn-modal-ok" onclick="saveEdit()">Salvar</button>
-    </div>
-  </div>
-</div>
 
 <!-- Modal Consolidar -->
 <div class="modal-overlay" id="consolidarOverlay">
@@ -1248,8 +1176,6 @@
     <h3 id="consolidarTitle">Consolidando...</h3>
     <div id="consolidarBody" style="margin:12px 0"></div>
     <div class="modal-actions" id="consolidarActions" style="display:none">
-      <button class="btn-modal-cancel" id="btnConsolidarFallback" onclick="_baixarFallback()" style="display:none">⬇ Baixar XLSX</button>
-      <button class="btn-modal-cancel" id="btnConsolidarLimpar" onclick="_limparFallback()" style="display:none">🗑 Limpar registros</button>
       <button class="btn-modal-ok" id="btnFecharConsolidar" onclick="fecharConsolidar()">Fechar</button>
     </div>
   </div>
@@ -1289,40 +1215,8 @@
       </div>
       <p class="admin-note">Para aplicar em todos os computadores: clique em "Exportar", salve o arquivo <strong>usuarios.json</strong> na pasta do projeto e rode <strong>ATUALIZAR.bat</strong>.</p>
 
-      <div class="admin-section">
-        <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px">Atualizar base ICOL / Fazendas</label>
-
-        <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
-          <span style="font-size:12px;flex:1">Base ICOL (.xlsm)</span>
-          <input type="file" id="inputBaseIcol" accept=".xlsm" style="font-size:11px;max-width:170px">
-          <button class="btn-modal-cancel" style="padding:4px 8px;font-size:11px" onclick="_toggleInfoBase('icol')" title="Formato esperado">ⓘ</button>
-        </div>
-        <div id="infoBaseIcol" style="display:none;font-size:11px;color:var(--muted);background:var(--surface2);border-radius:6px;padding:8px;margin-top:6px">
-          Aba <strong>"BASE PARA PLANEJAMENTO"</strong>, sem cabeçalho fixo: o sistema usa a primeira
-          linha em que a <strong>coluna AA</strong> tiver um número como início dos dados.
-          <strong>Coluna H</strong> = FRENTE, <strong>coluna I</strong> = PERÍODO OP (mês),
-          <strong>coluna AA</strong> = COD FAZ, <strong>coluna AB</strong> = FAZENDA. Uma linha por fazenda.
-          <div style="margin-top:6px"><button class="btn-modal-cancel" style="font-size:11px" onclick="_baixarModeloICOL()">⬇ Baixar modelo</button></div>
-        </div>
-
-        <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
-          <span style="font-size:12px;flex:1">Base de fazendas (.xlsx)</span>
-          <input type="file" id="inputBaseFazendas" accept=".xlsx" style="font-size:11px;max-width:170px">
-          <button class="btn-modal-cancel" style="padding:4px 8px;font-size:11px" onclick="_toggleInfoBase('fazendas')" title="Formato esperado">ⓘ</button>
-        </div>
-        <div id="infoBaseFazendas" style="display:none;font-size:11px;color:var(--muted);background:var(--surface2);border-radius:6px;padding:8px;margin-top:6px">
-          Cabeçalho na primeira linha, com as colunas <strong>SECAO</strong> (código da fazenda),
-          <strong>DESC_SECAO</strong> (nome da fazenda), <strong>TALHAO</strong> (número do talhão),
-          <strong>AREA_PROD</strong> (área em ha) e <strong>ESTAGIO</strong> (opcional). Uma linha por
-          talhão — toda fazenda do ICOL precisa ter aqui os seus talhões, senão é ignorada.
-          <div style="margin-top:6px"><button class="btn-modal-cancel" style="font-size:11px" onclick="_baixarModeloBaseFazendas()">⬇ Baixar modelo</button></div>
-        </div>
-
-        <div style="margin-top:10px">
-          <button class="btn-modal-ok" onclick="processarAtualizacaoBase()">Processar e atualizar</button>
-        </div>
-        <div id="logBaseAtualizacao" style="margin-top:8px;font-size:11px;line-height:1.8"></div>
-      </div>
+      <p class="admin-note">A demanda (Sequência de Plantio + Preparo + Base de Fazendas) é atualizada
+        rodando <strong>ATUALIZAR.bat</strong> na pasta do projeto — ver SETUP.md.</p>
 
       <div class="modal-actions">
         <button class="btn-modal-cancel" onclick="adminExportJson()">💾 Salvar e exportar usuarios.json</button>
@@ -1352,16 +1246,19 @@ const RE_ARQ_PROJETO = /^(\d+)_.+_(Rev\d+|Exp\d+)\.(dwg|zip|pdf)$/i;
 
 // ── Banco de dados (Supabase) ─────────────────────────────────────────────
 // Publishable key — feita para ser pública; segurança vem das policies de RLS.
-const SUPABASE_URL = 'PLACEHOLDER_PLANTIO_SUPABASE_URL';
-const SUPABASE_KEY = 'PLACEHOLDER_PLANTIO_SUPABASE_KEY';
+const SUPABASE_URL = 'https://msdkrkakuwmskoidxmxl.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_eJA9YDyXdRI73lqPPYnATA_INEU3vzu';
 
-// COD FAZ com este prefixo são unidades administrativas (espelha config.json:codfaz_excluir_prefixo)
-const CODFAZ_EXCLUIR_PREFIXO = '20';
-
+// Este projeto Supabase é compartilhado com o project-preparo — as tabelas do
+// Plantio vivem isoladas no schema "plantio" (não em "public"), por isso toda
+// chamada precisa indicar o schema via Accept-Profile (leitura) / Content-Profile
+// (escrita). Sem isso o PostgREST responde como se as tabelas não existissem.
 function _sbHeaders(extra) {
   return Object.assign({
     'apikey': SUPABASE_KEY,
     'Authorization': `Bearer ${SUPABASE_KEY}`,
+    'Accept-Profile': 'plantio',
+    'Content-Profile': 'plantio',
   }, extra || {});
 }
 
@@ -1399,9 +1296,15 @@ async function carregarDadosSupabase() {
       if (!faz) continue;
       if (!FAZENDAS[faz]) FAZENDAS[faz] = { cod: row.cod_faz, talhoes: {} };
       FAZENDAS[faz].talhoes[String(row.talhao)] = {
-        layer: row.layer, frente: row.frente, semana: row.periodo_op,
-        exp: row.status || '', tipo: row.tipo_linha || '', ciclo: row.ciclo || '',
-        ha: row.area_ha || 0, dia: null, estagio: row.estagio || ''
+        layer: row.layer,
+        mesPlantio: row.mes_plantio || null,
+        ciclo: row.ciclo || '',
+        ambiente: row.ambiente || '',
+        ha: row.area_ha || 0,
+        sistConser: row.sist_conser || '',
+        mapeamento: row.mapeamento || 'Não',
+        projeto: row.projeto || 'Pendente',
+        blocoId: row.bloco_id || '',
       };
       layerHa[String(row.layer)] = row.area_ha || 0;
     }
@@ -1429,200 +1332,20 @@ async function carregarDadosSupabase() {
   }
 }
 
-// ── Atualizar base ICOL/Fazendas direto pelo navegador ────────────────────
-function _toggleInfoBase(which) {
-  const el = document.getElementById(which === 'icol' ? 'infoBaseIcol' : 'infoBaseFazendas');
-  el.style.display = el.style.display === 'none' ? '' : 'none';
-}
-
-function _baixarModeloICOL() {
-  const row = (vals) => {
-    const arr = new Array(28).fill('');
-    for (const [i, v] of Object.entries(vals)) arr[+i] = v;
-    return arr;
-  };
-  const data = [
-    row({ 0: 'Linhas acima da primeira com número na coluna AA (COD FAZ) são ignoradas.' }),
-    row({ 7: 'FRENTE', 8: 'PERÍODO OP', 26: 'COD FAZ', 27: 'FAZENDA' }),
-    row({ 7: 2, 8: 6, 26: 10503, 27: 'SANTA LUZIA 5' }),
-    row({ 7: 3, 8: 7, 26: 10504, 27: 'SANTA LUZIA 6' }),
-  ];
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet(data);
-  XLSX.utils.book_append_sheet(wb, ws, 'BASE PARA PLANEJAMENTO');
-  XLSX.writeFile(wb, 'modelo_base_icol.xlsx');
-}
-
-function _baixarModeloBaseFazendas() {
-  const data = [
-    ['SECAO', 'DESC_SECAO', 'TALHAO', 'AREA_PROD', 'ESTAGIO'],
-    [10503, 'SANTA LUZIA 5', 1, 25.4, 'SOQUEIRA'],
-    [10503, 'SANTA LUZIA 5', 2, 18.9, 'CANA PLANTA'],
-    [10504, 'SANTA LUZIA 6', 1, 32.1, 'SOQUEIRA'],
-  ];
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet(data);
-  XLSX.utils.book_append_sheet(wb, ws, 'Fazendas');
-  XLSX.writeFile(wb, 'modelo_base_fazendas.xlsx');
-}
-
-function _logBase(msg) {
-  const el = document.getElementById('logBaseAtualizacao');
-  if (el) el.insertAdjacentHTML('beforeend', `<div>${msg}</div>`);
-}
-
-async function processarAtualizacaoBase() {
-  const fIcol = document.getElementById('inputBaseIcol')?.files?.[0];
-  const fFaz  = document.getElementById('inputBaseFazendas')?.files?.[0];
-  const log = document.getElementById('logBaseAtualizacao');
-  if (log) log.innerHTML = '';
-
-  if (!fIcol || !fFaz) {
-    _logBase('<span style="color:var(--red)">Selecione os dois arquivos (ICOL e base de fazendas).</span>');
-    return;
-  }
-
-  try {
-    _logBase('Lendo arquivos...');
-    const [bufIcol, bufFaz] = await Promise.all([fIcol.arrayBuffer(), fFaz.arrayBuffer()]);
-    const wbIcol = XLSX.read(bufIcol, { type: 'array' });
-    const wbFaz  = XLSX.read(bufFaz,  { type: 'array' });
-
-    // ── Parse ICOL: aba "BASE PARA PLANEJAMENTO", colunas H/I/AA/AB por posição ──
-    const sheetName = wbIcol.SheetNames.find(n => n.trim().toUpperCase() === 'BASE PARA PLANEJAMENTO') || wbIcol.SheetNames[0];
-    const wsIcol = wbIcol.Sheets[sheetName];
-    const rowsIcol = XLSX.utils.sheet_to_json(wsIcol, { header: 1, raw: true });
-
-    let firstDataRow = -1;
-    for (let i = 0; i < rowsIcol.length; i++) {
-      const cell = rowsIcol[i]?.[26];
-      if (cell !== undefined && cell !== '' && !isNaN(Number(cell))) { firstDataRow = i; break; }
-    }
-    if (firstDataRow < 0) throw new Error('Não foi possível localizar dados na aba "BASE PARA PLANEJAMENTO" (coluna AA deve conter o COD FAZ).');
-
-    const icolMap = new Map(); // codFaz → {frente, periodoOp, fazenda}
-    for (let i = firstDataRow; i < rowsIcol.length; i++) {
-      const r = rowsIcol[i];
-      const cell = r?.[26];
-      if (cell === undefined || cell === '' || isNaN(Number(cell))) continue;
-      const codFaz = Number(cell);
-      if (icolMap.has(codFaz)) continue; // dedupe, mantém o primeiro
-      icolMap.set(codFaz, {
-        frente: Number(r?.[7]),
-        periodoOp: Number(r?.[8]),
-        fazenda: String(r?.[27] ?? '').trim(),
-      });
-    }
-    _logBase(`ICOL: ${icolMap.size} fazenda(s) única(s).`);
-
-    // ── Parse base de fazendas: aba 1, colunas por nome ──
-    const wsFaz = wbFaz.Sheets[wbFaz.SheetNames[0]];
-    const rowsFaz = XLSX.utils.sheet_to_json(wsFaz, { raw: true });
-    const fazPorCod = new Map(); // codFaz → [{ talhao, areaHa, estagio }]
-    for (const r of rowsFaz) {
-      const codFaz = Number(r['SECAO']);
-      const talhao = Number(r['TALHAO']);
-      if (isNaN(codFaz) || isNaN(talhao)) continue;
-      const areaHa = Math.round((Number(r['AREA_PROD']) || 0) * 100) / 100;
-      const estagio = String(r['ESTAGIO'] ?? '').trim();
-      if (!fazPorCod.has(codFaz)) fazPorCod.set(codFaz, []);
-      fazPorCod.get(codFaz).push({ talhao, areaHa, estagio });
-    }
-    _logBase(`Base fazendas: ${rowsFaz.length} talhão(ões) lidos.`);
-
-    // ── Merge ICOL × base de fazendas ──
-    let semBase = 0;
-    let excluidasAdmin = 0;
-    const progRows = [];
-    for (const [codFaz, icolRow] of icolMap) {
-      if (String(codFaz).startsWith(CODFAZ_EXCLUIR_PREFIXO)) { excluidasAdmin++; continue; }
-      const talhoes = fazPorCod.get(codFaz);
-      if (!talhoes || !talhoes.length) { semBase++; continue; }
-      for (const t of talhoes) {
-        const layer = Number(`${codFaz}${String(t.talhao).padStart(3, '0')}`);
-        progRows.push({
-          layer, frente: icolRow.frente, periodo_op: icolRow.periodoOp,
-          cod_faz: codFaz, fazenda: icolRow.fazenda,
-          talhao: t.talhao, area_ha: t.areaHa, estagio: t.estagio,
-        });
-      }
-    }
-    if (excluidasAdmin) _logBase(`${excluidasAdmin} fazenda(s) administrativa(s) (prefixo ${CODFAZ_EXCLUIR_PREFIXO}) excluída(s).`);
-    if (semBase) _logBase(`<span style="color:var(--accent)">⚠ ${semBase} fazenda(s) do ICOL sem talhões na base de fazendas (ignoradas).</span>`);
-    _logBase(`${progRows.length} talhão(ões) para processar.`);
-    if (!progRows.length) { _logBase('<span style="color:var(--red)">Nada para enviar.</span>'); return; }
-
-    // ── Preserva STATUS/TIPO_LINHA/CICLO já preenchidos ──
-    _logBase('Lendo programação existente no Supabase...');
-    const existentes = await _sbFetchAll(`${SUPABASE_URL}/rest/v1/programacao?select=layer,status,tipo_linha,ciclo`);
-    const preserved = new Map(existentes.map(r => [String(r.layer), r]));
-
-    let novos = 0;
-    for (const row of progRows) {
-      const prev = preserved.get(String(row.layer));
-      if (prev) {
-        row.status = prev.status || '';
-        row.tipo_linha = prev.tipo_linha || '';
-        row.ciclo = prev.ciclo || '';
-      } else {
-        row.status = ''; row.tipo_linha = ''; row.ciclo = '';
-        novos++;
-      }
-    }
-
-    // ── Upsert em lotes ──
-    _logBase(`Enviando ${progRows.length} linha(s) (novas: ${novos}, preservadas: ${progRows.length - novos})...`);
-    const BATCH = 500;
-    for (let i = 0; i < progRows.length; i += BATCH) {
-      const chunk = progRows.slice(i, i + BATCH);
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/programacao`, {
-        method: 'POST',
-        headers: _sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
-        body: JSON.stringify(chunk),
-      });
-      if (!res.ok) throw new Error(`upsert ${i}-${i + chunk.length}: ${res.status} ${await res.text()}`);
-      _logBase(`  ${Math.min(i + BATCH, progRows.length)}/${progRows.length}`);
-    }
-
-    // ── Avisa sobre LAYERs preenchidos que saíram da base ativa ──
-    const novosLayers = new Set(progRows.map(r => String(r.layer)));
-    const removidos = [...preserved.entries()].filter(([ly, v]) => !novosLayers.has(ly) && (v.status || v.tipo_linha || v.ciclo));
-    if (removidos.length) {
-      _logBase(`<span style="color:var(--accent)">⚠ ${removidos.length} LAYER(s) preenchido(s) não estão mais na base ativa (dados continuam no banco).</span>`);
-    }
-
-    _logBase('<span style="color:var(--green);font-weight:700">Atualização concluída!</span>');
-
-    await carregarDadosSupabase();
-    renderFazendas(currentNames);
-    renderPlano();
-    renderDashboard();
-  } catch (e) {
-    _logBase(`<span style="color:var(--red)">✗ ${e.message}</span>`);
-  }
-}
+// ── Import agora é feito pela engine Python (sistema_preenchimento/engine/atualizar_programacao.py) ──
 
 // ── State ─────────────────────────────────────────────────────────────────
+// Cada alteração de Mapeamento/Projeto é salva direto no Supabase (sem lote local
+// diário) — por isso não há mais risco de perda de dados não exportados, nem
+// necessidade de banner de pendências entre sessões.
 let currentUser = (localStorage.getItem('gf_user') || '').toLowerCase();
 if (currentUser) localStorage.setItem('gf_user', currentUser);
-let exportado   = false;
 
-window.addEventListener('beforeunload', e => {
-  if (records.length > 0 && !exportado) {
-    e.preventDefault();
-    e.returnValue = '';
-  }
-});
-let currentFaz  = null;
-let cobertura   = 'inteira';
-let records     = [];
+let currentFaz     = null;
+let currentBlocoId = null;
+let records        = [];   // log de alterações desta sessão (só para exibição em "Registros do dia")
 let _arquivosEsperados = [];
 let _arquivosSelecionados = [];
-let _pendingReload = false;
-
-// Load today's records from localStorage
-const todayKey = 'gf_records_' + new Date().toISOString().slice(0,10);
-try { records = JSON.parse(localStorage.getItem(todayKey) || '[]'); } catch(e) { records = []; }
 
 // ── Init ──────────────────────────────────────────────────────────────────
 window.onload = async () => {
@@ -1640,8 +1363,7 @@ window.onload = async () => {
   updateUserBadge();
   if (currentUser) applyUserPermissions(currentUser);
   renderLog();
-  updateExportBar(); updateStats();
-  checkPendentes();
+  updateStats();
   renderPlano();
   renderDashboard();
   if (!currentUser) setTimeout(openUserModal, 400);
@@ -1649,87 +1371,30 @@ window.onload = async () => {
   if (lastFaz && FAZENDAS[lastFaz]) selectFazenda(lastFaz);
 };
 
-// ── Registros pendentes de dias anteriores ────────────────────────────────
-function checkPendentes() {
-  const hoje = new Date().toISOString().slice(0, 10);
-  let pendente = null;
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (!key.startsWith('gf_records_')) continue;
-    const dia = key.replace('gf_records_', '');
-    if (dia === hoje) continue;
-    try {
-      const recs = JSON.parse(localStorage.getItem(key) || '[]');
-      if (recs.length > 0) { pendente = { key, dia, recs }; break; }
-    } catch(_) {}
-  }
-  if (!pendente) return;
-
-  const { key, dia, recs } = pendente;
-  const ha = totalHaRecords(recs);
-  const [ano, mes, d] = dia.split('-');
-  const diaFmt = `${d}/${mes}/${ano}`;
-  const banner = document.getElementById('bannerPendente');
-  banner.innerHTML = `<div class="banner-pendente">
-    <span>Você tem <strong>${recs.length} registros não exportados de ${diaFmt}</strong> (${ha.toFixed(1)} ha). Exportar antes de continuar?</span>
-    <div class="banner-actions">
-      <button class="btn-banner-export" onclick="exportarPendente('${key}','${diaFmt}')">Exportar agora</button>
-      <button class="btn-banner-discard" onclick="descartarPendente('${key}')">Descartar</button>
-    </div>
-  </div>`;
-  banner.style.display = 'block';
-}
-
-function exportarPendente(key, diaFmt) {
-  const recs = JSON.parse(localStorage.getItem(key) || '[]');
-  if (!recs.length) { descartarPendente(key); return; }
-  const usuario = recs[0]?.usuario || currentUser || 'usuario';
-  const dia = key.replace('gf_records_', '');
-  const wsData = [
-    ['TIMESTAMP','USUARIO','LAYER','COD_FAZ','FAZENDA','TALHAO','FRENTE','SEMANA','AREA_HA','TIPO_LINHA','CICLO','STATUS'],
-    ...recs.map(r => [
-      r.timestamp, r.usuario, r.layer, r.cod_faz,
-      r.fazenda, r.talhao, r.frente, r.semana,
-      r.ha || 0, r.tipo, r.ciclo, r.status
-    ])
-  ];
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet(wsData);
-  ws['!cols'] = [18,12,12,10,28,8,8,8,9,18,8,14].map(w => ({wch:w}));
-  XLSX.utils.book_append_sheet(wb, ws, 'Registros');
-  XLSX.writeFile(wb, `export_frentes_${usuario}_${dia}.xlsx`);
-  descartarPendente(key);
-  showToast(`${recs.length} registros de ${diaFmt} exportados.`);
-}
-
-function descartarPendente(key) {
-  localStorage.removeItem(key);
-  document.getElementById('bannerPendente').style.display = 'none';
-  checkPendentes();
-}
-
-// ── Mês atual ─────────────────────────────────────────────────────────────
+// ── Mês de Plantio (prazo) ────────────────────────────────────────────────
 const _hoje = new Date();
 const _anoAtual = _hoje.getFullYear(), _mesAtual = _hoje.getMonth();
-function is18m(estagio) {
-  if (!estagio) return false;
-  const e = estagio.toUpperCase();
-  return e.includes('18') || e.includes('INVERNO') ||
-         e.includes('FORMA') || e === 'ANO';
+
+// Sist. Conser. que exige Mapeamento antes do Projeto poder avançar (ver SETUP.md).
+const SIST_CONSER_PRECISA_MAPEAMENTO = new Set(['EMBUTIDO', 'INTERCALADA', 'INTERCALADO']);
+function precisaMapeamento(sistConser) {
+  return SIST_CONSER_PRECISA_MAPEAMENTO.has((sistConser || '').toUpperCase());
 }
 
-// Converte período de colheita (1-12) → "YYYY-MM" (todos no ano atual)
-function semanaToYM(semana) {
-  if (!semana) return null;
-  const m = +semana;
-  if (!m || m < 1 || m > 12) return null;
-  return `${_anoAtual}-${String(m).padStart(2, '0')}`;
+// Rollup de Sist. Conser. de um bloco: qualquer EMBUTIDO/INTERCALADA → bloco inteiro EMBUTIDO;
+// senão, vale o valor com mais ocorrências. '' (sem dado ainda) é tratado como "precisa atenção".
+function rollupSistConser(tals) {
+  const vals = tals.map(t => (t.sistConser || '').toUpperCase()).filter(Boolean);
+  if (!vals.length) return '';
+  if (vals.some(v => SIST_CONSER_PRECISA_MAPEAMENTO.has(v))) return 'EMBUTIDO';
+  const counts = {};
+  vals.forEach(v => counts[v] = (counts[v] || 0) + 1);
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
 }
 
-// Retorna "YYYY-MM" de um talhão — usa dia (data) se disponível, senão semana (período)
+// Retorna "YYYY-MM" de um talhão a partir do Mês de Plantio (data real, sem aproximação de ano).
 function talYM(t) {
-  if (t.dia) return t.dia.slice(0, 7);
-  return semanaToYM(t.semana);
+  return t.mesPlantio ? t.mesPlantio.slice(0, 7) : null;
 }
 
 function isCurMonth(t) {
@@ -1897,9 +1562,9 @@ function filterFazendas(q) {
       })
     : [...FAZENDA_NAMES];
 
-  if (activeFilters.has('a_fazer'))   names = names.filter(n => getFazStatus(n).status === 'A FAZER');
+  if (activeFilters.has('a_fazer'))   names = names.filter(n => getFazStatus(n).status !== 'OK');
   if (activeFilters.has('mes_atual')) names = names.filter(n => Object.values(FAZENDAS[n].talhoes).some(t => isSelMonth(t)));
-  if (activeFilters.has('18m'))       names = names.filter(n => Object.values(FAZENDAS[n].talhoes).some(t => is18m(t.estagio)));
+  if (activeFilters.has('18m'))       names = names.filter(n => Object.values(FAZENDAS[n].talhoes).some(t => precisaMapeamento(t.sistConser)));
 
   currentNames = names;
   renderFazendas(currentNames);
@@ -1909,8 +1574,8 @@ function filterFazendas(q) {
 
 function selectFazenda(name) {
   currentFaz = name;
+  currentBlocoId = null;
   sessionStorage.setItem('gf_lastFaz', name);
-  cobertura = 'inteira';
   document.getElementById('fazDropdown').classList.remove('open');
   document.getElementById('searchFaz').value = '';
 
@@ -1920,16 +1585,14 @@ function selectFazenda(name) {
 
   document.getElementById('placeholder').style.display = 'none';
   document.getElementById('formArea').style.display = 'block';
+  document.getElementById('blocoPanel').style.display = 'none';
 
   const d = FAZENDAS[name];
   document.getElementById('formFazTitle').textContent = name;
-  const frentes = [...new Set(Object.values(d.talhoes).map(t => t.frente).filter(Boolean))].sort((a,b)=>a-b);
-  document.getElementById('formFrenteTag').textContent = frentes.length ? 'Frente ' + frentes.join(', ') : '—';
+  document.getElementById('formBlocoTag').textContent = '—';
   document.getElementById('formCodTag').textContent = 'COD ' + d.cod;
 
-  setCobertura('inteira');
-  renderTalhoes();
-  updateSubmitBtn();
+  renderBlocos();
 }
 
 document.addEventListener('click', e => {
@@ -1938,173 +1601,188 @@ document.addEventListener('click', e => {
   }
 });
 
-// ── Talhões ───────────────────────────────────────────────────────────────
-function renderTalhoes() {
-  const grid = document.getElementById('talhoesGrid');
-  if (!currentFaz) return;
-  const tals = Object.keys(FAZENDAS[currentFaz].talhoes).sort((a,b) => +a - +b);
-
-  grid.innerHTML = tals.map(t => {
-    const td = FAZENDAS[currentFaz].talhoes[t];
-    const badge18 = is18m(td.estagio)
-      ? '<span class="tal-chip-18m">18m</span>' : '';
-    return `<div class="tal-chip ${cobertura==='inteira'?'selected disabled':''}"
-                 data-tal="${t}" onclick="toggleTal(this)">${t}${badge18}</div>`;
-  }).join('');
-
-  updateTalCount();
-}
-
-function toggleTal(el) {
-  if (cobertura !== 'parcial') return;
-  el.classList.toggle('selected');
-  updateTalCount();
-  updateSubmitBtn();
-}
-
-function select18mTal() {
-  document.querySelectorAll('.tal-chip').forEach(c => {
-    if (c.querySelector('.tal-chip-18m')) c.classList.add('selected');
+// ── Blocos (grupo de talhões da Sequência de Plantio que compartilham bloco_id) ──
+function getBlocos(name) {
+  const grupos = new Map();
+  Object.entries(FAZENDAS[name]?.talhoes || {}).forEach(([tal, td]) => {
+    const key = td.blocoId || `_sem-bloco_${tal}`;
+    if (!grupos.has(key)) grupos.set(key, []);
+    grupos.get(key).push({ tal: +tal, ...td });
   });
-  updateTalCount(); updateSubmitBtn();
+  return [...grupos.entries()].map(([blocoId, tals]) => ({
+    blocoId, tals,
+    mesPlantio: tals[0].mesPlantio,
+    ambiente:   tals[0].ambiente,
+    ha:         tals.reduce((s, t) => s + (t.ha || 0), 0),
+    sistConser: rollupSistConser(tals),
+    mapeamento: tals[0].mapeamento,
+    projeto:    tals[0].projeto,
+  })).sort((a, b) => (a.mesPlantio || '9999').localeCompare(b.mesPlantio || '9999'));
 }
 
-function selectAllTal() {
-  document.querySelectorAll('.tal-chip').forEach(c => c.classList.add('selected'));
-  updateTalCount(); updateSubmitBtn();
+function fmtMesPlantio(iso) {
+  if (!iso) return '—';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
 }
 
-function clearAllTal() {
-  document.querySelectorAll('.tal-chip').forEach(c => c.classList.remove('selected'));
-  updateTalCount(); updateSubmitBtn();
+function renderBlocos() {
+  const blocos = getBlocos(currentFaz);
+  document.getElementById('blocosList').innerHTML = blocos.length ? blocos.map(b => {
+    const cls   = b.projeto === 'Ok' ? 'green' : b.projeto === 'Andamento' ? 'accent' : 'blue';
+    const scCls = !b.sistConser ? 'muted' : precisaMapeamento(b.sistConser) ? 'accent' : 'green';
+    const talsTxt = b.tals.map(t => t.tal).sort((a, c) => a - c).join(', ');
+    return `<div class="fazenda-item${b.blocoId === currentBlocoId ? ' active' : ''}"
+                 style="background:var(--bg);border:1px solid var(--border);border-radius:8px"
+                 onclick="selectBloco('${b.blocoId.replace(/'/g, "\\'")}')">
+      <div style="flex:1;min-width:0">
+        <div class="fazenda-name">${fmtMesPlantio(b.mesPlantio)}
+          <span style="font-weight:400;color:var(--muted);font-size:12px">talhões ${talsTxt}</span></div>
+        <div class="fazenda-meta" style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">
+          <span class="faz-tag faz-tag-${scCls}">${b.sistConser || 'SEM DADO'}</span>
+          <span class="faz-tag faz-tag-muted">MAP: ${b.mapeamento.toUpperCase()}</span>
+          <span class="faz-tag faz-tag-${cls}">${b.projeto.toUpperCase()}</span>
+        </div>
+      </div>
+      <div class="fazenda-count">${b.ha.toFixed(1)} ha</div>
+    </div>`;
+  }).join('') : '<div style="color:var(--muted);font-size:13px">Nenhum bloco para esta fazenda.</div>';
 }
 
-function selectRestantesTal() {
-  const registrados = new Set(
-    records.filter(r => r.fazenda === currentFaz).map(r => r.talhao)
-  );
-  document.querySelectorAll('.tal-chip').forEach(c => {
-    c.classList.toggle('selected', !registrados.has(+c.dataset.tal));
-  });
-  updateTalCount(); updateSubmitBtn();
+// ── Painel de registro do bloco ────────────────────────────────────────────
+let _blocoSistConser = '';
+let _blocoMapeamento = 'Não';
+
+function selectBloco(blocoId) {
+  currentBlocoId = blocoId;
+  const b = getBlocos(currentFaz).find(x => x.blocoId === blocoId);
+  renderBlocos();
+  if (!b) return;
+
+  document.getElementById('formBlocoTag').textContent = fmtMesPlantio(b.mesPlantio);
+  document.getElementById('blocoPanel').style.display = 'block';
+
+  document.getElementById('talhoesGrid').innerHTML = b.tals
+    .sort((a, c) => a.tal - c.tal)
+    .map(t => `<div class="tal-chip selected disabled">${t.tal}</div>`).join('');
+
+  _blocoMapeamento = b.mapeamento === 'Sim' ? 'Sim' : 'Não';
+  document.getElementById('selProjeto').value = b.projeto || 'Pendente';
+  atualizarMapeamentoBtns();
+  aplicarGatingProjeto(b.sistConser);
+  updateSalvarBtn();
 }
 
-function updateTalCount() {
-  const total = document.querySelectorAll('.tal-chip').length;
-  const sel   = cobertura === 'inteira' ? total : document.querySelectorAll('.tal-chip.selected').length;
-  const el    = document.getElementById('talSel');
-  el.textContent = sel > 0 ? `(${sel}/${total})` : `(0/${total})`;
+function atualizarMapeamentoBtns() {
+  document.getElementById('btnMapNao').classList.toggle('active', _blocoMapeamento === 'Não');
+  document.getElementById('btnMapSim').classList.toggle('active', _blocoMapeamento === 'Sim');
 }
 
-function getSelectedTals() {
-  if (cobertura === 'inteira') {
-    if (!currentFaz || !FAZENDAS[currentFaz]) return [];
-    return Object.keys(FAZENDAS[currentFaz].talhoes).map(Number).sort((a,b)=>a-b);
+function setMapeamento(val) {
+  _blocoMapeamento = val;
+  atualizarMapeamentoBtns();
+  aplicarGatingProjeto(_blocoSistConser);
+  updateSalvarBtn();
+}
+
+// EMBUTIDO/INTERCALADA exigem Mapeamento=Sim antes do Projeto avançar; sem Sist. Conser.
+// ainda registrado na base de preparo, também não dá pra avançar (situação ainda incerta).
+function bloqueiaProjeto(sistConser, mapeamento) {
+  if (!sistConser) return true;
+  if (precisaMapeamento(sistConser)) return mapeamento !== 'Sim';
+  return false;
+}
+
+function aplicarGatingProjeto(sistConser) {
+  _blocoSistConser = sistConser;
+  const bloqueado = bloqueiaProjeto(sistConser, _blocoMapeamento);
+  const sel = document.getElementById('selProjeto');
+  [...sel.options].forEach(opt => { opt.disabled = bloqueado && opt.value !== 'Pendente'; });
+  if (bloqueado && sel.value !== 'Pendente') sel.value = 'Pendente';
+
+  const info = document.getElementById('gatingInfo');
+  if (!bloqueado) {
+    info.style.display = 'none';
+  } else {
+    info.style.display = '';
+    info.textContent = sistConser
+      ? '⚠ Sist. Conser. exige Mapeamento = Sim antes do Projeto poder avançar.'
+      : '⚠ Ainda sem Sist. Conser. da base de preparo — Projeto fica em Pendente até essa informação chegar.';
   }
-  return [...document.querySelectorAll('.tal-chip.selected')].map(c => +c.dataset.tal);
 }
 
-// ── Cobertura ─────────────────────────────────────────────────────────────
-function setCobertura(tipo) {
-  cobertura = tipo;
-  document.getElementById('btnInteira').classList.toggle('active', tipo==='inteira');
-  document.getElementById('btnParcial').classList.toggle('active', tipo==='parcial');
-  document.getElementById('talActions').style.display = tipo==='parcial' ? 'flex' : 'none';
+document.getElementById('selProjeto').onchange = updateSalvarBtn;
 
-  document.querySelectorAll('.tal-chip').forEach(c => {
-    c.classList.toggle('selected', tipo==='inteira');
-    c.classList.toggle('disabled',  tipo==='inteira');
-  });
-  updateTalCount(); updateSubmitBtn();
-}
-
-// ── Submit ────────────────────────────────────────────────────────────────
-function updateSubmitBtn() {
-  const tipo   = document.getElementById('selTipo').value;
-  const ciclo  = document.getElementById('selCiclo').value;
-  const status = document.getElementById('selStatus').value;
-  const tals   = getSelectedTals();
-  const isSemLinhas = tipo === 'SEM LINHAS';
-  const ok = currentUser && currentFaz && tipo && (ciclo || isSemLinhas) && status && tals.length > 0;
-
+// ── Salvar ────────────────────────────────────────────────────────────────
+function updateSalvarBtn() {
+  const ok = !!(currentUser && currentFaz && currentBlocoId);
   document.getElementById('btnSubmit').disabled = !ok;
 
   const info = document.getElementById('submitInfo');
-  if (!currentUser)   info.textContent = '⚠ selecione seu usuário';
-  else if (!tipo)     info.textContent = 'selecione o tipo de linha';
-  else if (!ciclo)    info.textContent = 'selecione o ciclo';
-  else if (!status)   info.textContent = 'selecione o status';
-  else if (!tals.length) info.textContent = 'selecione ao menos um talhão';
+  if (!currentUser)        info.textContent = '⚠ selecione seu usuário';
+  else if (!currentBlocoId) info.textContent = 'selecione um bloco';
   else {
-    const totalHa = tals.reduce((sum, t) => {
-      const td = FAZENDAS[currentFaz]?.talhoes[String(t)];
-      return sum + (td?.ha || 0);
-    }, 0);
-    info.textContent = `${tals.length} talhão(ões) — ${totalHa.toFixed(1)} ha`;
+    const b = getBlocos(currentFaz).find(x => x.blocoId === currentBlocoId);
+    info.textContent = b ? `${b.tals.length} talhão(ões) — ${b.ha.toFixed(1)} ha` : '';
   }
 }
 
-document.getElementById('selTipo').onchange = function() {
-  const isSemLinhas = this.value === 'SEM LINHAS';
-  const selStatus = document.getElementById('selStatus');
-  const selCiclo  = document.getElementById('selCiclo');
-  if (isSemLinhas) {
-    selStatus.value    = 'SEM LINHAS';
-    selStatus.disabled = true;
-    selCiclo.value     = '';
-    selCiclo.disabled  = true;
-  } else {
-    selStatus.disabled = false;
-    selCiclo.disabled  = false;
-  }
-  updateSubmitBtn();
-};
-document.getElementById('selCiclo').onchange  = updateSubmitBtn;
-document.getElementById('selStatus').onchange = updateSubmitBtn;
+async function salvarBloco() {
+  if (!currentUser || !currentFaz || !currentBlocoId) return;
+  const b = getBlocos(currentFaz).find(x => x.blocoId === currentBlocoId);
+  if (!b) return;
 
-function registrar() {
-  const fazData = FAZENDAS[currentFaz];
-  const tipo   = document.getElementById('selTipo').value;
-  const ciclo  = document.getElementById('selCiclo').value;
-  const status = document.getElementById('selStatus').value;
-  const tals   = getSelectedTals();
-  const now    = new Date();
-  const ts     = now.toLocaleString('pt-BR');
+  const mapeamento = _blocoMapeamento;
+  const projeto    = document.getElementById('selProjeto').value;
+  const agora       = new Date().toISOString();
+  const btn = document.getElementById('btnSubmit');
+  btn.disabled = true;
 
-  tals.forEach(tal => {
-    const td = fazData.talhoes[String(tal)];
-    records.push({
-      timestamp: ts,
-      usuario:   currentUser,
-      layer:     td?.layer || (fazData.cod * 1000 + tal),
-      fazenda:   currentFaz,
-      cod_faz:   fazData.cod,
-      talhao:    tal,
-      frente:    td?.frente || '—',
-      semana:    td?.semana || '—',
-      ha:        td?.ha || 0,
-      tipo,
-      ciclo,
-      status
+  try {
+    await Promise.all(b.tals.map(async t => {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/programacao?layer=eq.${t.layer}`, {
+        method: 'PATCH',
+        headers: _sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
+        body: JSON.stringify({ mapeamento, projeto, updated_at: agora }),
+      });
+      if (!res.ok) throw new Error(`layer ${t.layer}: ${res.status} ${await res.text()}`);
+    }));
+
+    const logRows = b.tals.map(t => ({
+      data_consolidacao: agora, registrado_em: agora, usuario: currentUser,
+      layer: t.layer, fazenda: currentFaz, talhao: t.tal,
+      mapeamento, ciclo: t.ciclo, projeto,
+    }));
+    const logRes = await fetch(`${SUPABASE_URL}/rest/v1/log_exportacoes`, {
+      method: 'POST',
+      headers: _sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
+      body: JSON.stringify(logRows),
     });
-  });
+    if (!logRes.ok) throw new Error(`log_exportacoes: ${logRes.status} ${await logRes.text()}`);
 
-  localStorage.setItem(todayKey, JSON.stringify(records));
-  showToast(`${tals.length} talhão(ões) registrados`);
-  renderLog();
-  updateExportBar(); updateStats();
-  renderFazendas(currentNames);
-  renderPlano();
-  if (document.getElementById('viewDashboard').style.display !== 'none') renderDashboard();
+    b.tals.forEach(t => {
+      const td = FAZENDAS[currentFaz].talhoes[String(t.tal)];
+      if (td) { td.mapeamento = mapeamento; td.projeto = projeto; }
+    });
 
-  // Reset form fields
-  document.getElementById('selTipo').value    = '';
-  document.getElementById('selCiclo').value   = '';
-  document.getElementById('selStatus').value  = '';
-  document.getElementById('selCiclo').disabled  = false;
-  document.getElementById('selStatus').disabled = false;
-  setCobertura('inteira');
-  updateSubmitBtn();
+    records.push({
+      timestamp: new Date().toLocaleString('pt-BR'), usuario: currentUser,
+      fazenda: currentFaz, talhoes: b.tals.map(t => t.tal).sort((x, y) => x - y).join(', '),
+      ha: b.ha, mapeamento, projeto,
+    });
+
+    showToast(`Bloco salvo — ${b.tals.length} talhão(ões)`);
+    renderLog();
+    updateStats();
+    selectBloco(currentBlocoId);
+    renderFazendas(currentNames);
+    renderPlano();
+    if (document.getElementById('viewDashboard').style.display !== 'none') renderDashboard();
+  } catch (e) {
+    showToast(`Erro ao salvar: ${e.message}`);
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 // ── Log ───────────────────────────────────────────────────────────────────
@@ -2119,41 +1797,23 @@ function renderLog() {
   }
   sec.classList.add('visible');
 
-  // Group by timestamp+fazenda for cleaner display
-  const rows = [...records].reverse().map((r, i) => {
-    const idx = records.length - 1 - i;
-    return `<tr>
+  const rows = [...records].reverse().map(r => `<tr>
       <td>${r.timestamp}</td>
       <td>${r.usuario}</td>
       <td><strong>${r.fazenda}</strong></td>
-      <td style="font-family:monospace">${r.talhao}</td>
-      <td style="font-family:monospace">${r.layer}</td>
+      <td style="font-family:monospace">${r.talhoes}</td>
       <td style="font-family:monospace">${(r.ha||0).toFixed(1)} ha</td>
-      <td>${r.tipo}</td>
-      <td>${r.ciclo}</td>
-      <td><span class="status-pill status-${r.status}">${r.status}</span></td>
-      <td style="white-space:nowrap">
-        <button class="btn-edit" data-idx="${idx}" onclick="openEditModal(+this.dataset.idx)" title="editar">✎</button>
-        <button class="btn-del"  data-idx="${idx}" onclick="delRecord(+this.dataset.idx)"  title="remover">✕</button>
-      </td>
-    </tr>`;
-  }).join('');
+      <td>${r.mapeamento}</td>
+      <td><span class="status-pill status-${r.projeto}">${r.projeto}</span></td>
+    </tr>`).join('');
 
   content.innerHTML = `<table>
     <thead><tr>
-      <th>Horário</th><th>Usuário</th><th>Fazenda</th><th>Talhão</th>
-      <th>Layer</th><th>Área</th><th>Tipo</th><th>Ciclo</th><th>Status</th><th></th>
+      <th>Horário</th><th>Usuário</th><th>Fazenda</th><th>Talhões</th>
+      <th>Área</th><th>Mapeamento</th><th>Projeto</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
-}
-
-function delRecord(idx) {
-  if (!confirm('Remover este registro?')) return;
-  records.splice(idx, 1);
-  localStorage.setItem(todayKey, JSON.stringify(records));
-  renderLog();
-  updateExportBar(); updateStats();
 }
 
 function scrollToLog() {
@@ -2164,7 +1824,7 @@ function scrollToLog() {
 function updateStats() {
   const registered = new Set(records.map(r => r.fazenda));
   const regFaz  = registered.size;
-  const regTal  = records.length;
+  const regTal  = records.reduce((s, r) => s + String(r.talhoes).split(',').length, 0);
   const ha      = totalHaRecords(records);
 
   if (planFazendas.length > 0) {
@@ -2185,12 +1845,12 @@ function updateStats() {
     document.getElementById('statProgSub').textContent   = `${planDone} de ${planTotal} no plano`;
     document.getElementById('statLabel1').textContent    = 'Plano da Semana';
   } else {
-    // Sem plano: exibe totais da base
+    // Sem plano: exibe totais da demanda
     const totalFaz = FAZENDA_NAMES.length;
     const totalTal = FAZENDA_NAMES.reduce((s, n) => s + Object.keys(FAZENDAS[n].talhoes).length, 0);
     const conclFaz = FAZENDA_NAMES.filter(n => {
       const tals = Object.values(FAZENDAS[n].talhoes);
-      return tals.length > 0 && tals.every(t => t.exp === 'CONCLUIDO' || t.exp === 'SEM LINHAS');
+      return tals.length > 0 && tals.every(t => t.projeto === 'Ok');
     }).length;
     const pct = totalFaz > 0 ? Math.round(conclFaz / totalFaz * 100) : 0;
 
@@ -2201,7 +1861,7 @@ function updateStats() {
     document.getElementById('statHa').textContent        = ha.toLocaleString('pt-BR', {minimumFractionDigits:1, maximumFractionDigits:1});
     document.getElementById('statPct').textContent       = pct + '%';
     document.getElementById('statProgSub').textContent   = `${conclFaz} de ${totalFaz} concluídas`;
-    document.getElementById('statLabel1').textContent    = 'Base ICOL';
+    document.getElementById('statLabel1').textContent    = 'Demanda Plantio';
   }
 }
 
@@ -2209,42 +1869,11 @@ function totalHaRecords(recs) {
   return recs.reduce((s, r) => s + (r.ha || 0), 0);
 }
 
-function updateExportBar() {
-  const n  = records.length;
-  const ha = totalHaRecords(records);
-  document.getElementById('exportInfo').textContent =
-    n > 0 ? `${n} registro(s) — ${ha.toFixed(1)} ha` : '0 registros';
-  document.getElementById('btnExport').disabled = n === 0;
-  document.getElementById('btnClear').style.display = n > 0 ? 'inline-block' : 'none';
-}
-
-function _exportarXLSX() {
-  if (!records.length || !currentUser) return;
-  const hoje = new Date().toISOString().slice(0,10);
-  const wsData = [
-    ['TIMESTAMP','USUARIO','LAYER','COD_FAZ','FAZENDA','TALHAO','FRENTE','SEMANA','AREA_HA','TIPO_LINHA','CICLO','STATUS'],
-    ...records.map(r => [
-      r.timestamp, r.usuario, r.layer, r.cod_faz,
-      r.fazenda, r.talhao, r.frente, r.semana,
-      r.ha || 0, r.tipo, r.ciclo, r.status
-    ])
-  ];
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet(wsData);
-  ws['!cols'] = [18,12,12,10,28,8,8,8,9,18,8,14].map(w => ({wch:w}));
-  XLSX.utils.book_append_sheet(wb, ws, 'Registros');
-  XLSX.writeFile(wb, `export_frentes_${currentUser}_${hoje}.xlsx`);
-  showToast(`${records.length} registros baixados — mova para exports/ e rode CONSOLIDAR.bat`);
-}
-
-function exportar() { _exportarXLSX(); exportado = true; updateExportBar(); updateStats(); }
-
-// ── Consolidar direto no Supabase ─────────────────────────────────────────
-function _abrirConsolidarModal(titulo, html, mostrarFallback) {
+// ── Modal genérico (reaproveitado pelo upload de arquivos de projeto) ─────
+function _abrirConsolidarModal(titulo, html) {
   document.getElementById('consolidarTitle').textContent = titulo;
   document.getElementById('consolidarBody').innerHTML   = html;
   document.getElementById('consolidarActions').style.display = '';
-  document.getElementById('btnConsolidarFallback').style.display = mostrarFallback ? '' : 'none';
   document.getElementById('btnFecharConsolidar').disabled = false;
   const el = document.getElementById('consolidarOverlay');
   el.style.display = '';
@@ -2255,163 +1884,29 @@ function fecharConsolidar() {
   const el = document.getElementById('consolidarOverlay');
   el.classList.remove('open');
   el.style.display = 'none';
-  if (_pendingReload) { _pendingReload = false; location.reload(); }
 }
 
-function _baixarFallback() {
-  exportar();
-  document.getElementById('btnConsolidarLimpar').style.display = '';
+// ── Upload de arquivos de projeto (.dwg/.zip/.pdf) — disparado do painel do bloco ──
+function abrirArquivosProjeto() {
+  if (!currentFaz) return;
+  const cod = String(FAZENDAS[currentFaz]?.cod ?? '');
+  _arquivosEsperados = [{suf:'Rev0',ext:'dwg'},{suf:'Exp0',ext:'zip'},{suf:'Rev0',ext:'pdf'}]
+    .map(({suf,ext}) => ({ cod, faz: currentFaz, suf, ext, nome: `${cod}_*_${suf}.${ext}`, ok: false, matched: null }));
+  _arquivosSelecionados = [];
+
+  _abrirConsolidarModal(`Arquivos do projeto — ${currentFaz}`, `
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
+      Selecione os ${_arquivosEsperados.length} arquivo(s) correspondentes aos itens abaixo (pode selecionar vários de uma vez).
+      O nome deve seguir o padrão <code>{COD_FAZ}_{NOME}_{Rev0|Exp0}.{dwg|zip|pdf}</code> (separado por "_") —
+      o nome da fazenda no meio pode variar, o sistema identifica pelo código e pelo sufixo.
+    </div>
+    <ul id="checklistArquivos" style="list-style:none;padding:0;margin:0 0 8px;font-size:11px;line-height:1.9">
+      ${_arquivosEsperados.map(a => `<li data-nome="${a.nome}">⬜ ${a.nome}</li>`).join('')}
+    </ul>
+    <input type="file" id="inputArquivosProjeto" accept=".dwg,.zip,.pdf" multiple onchange="_adicionarArquivoProjeto(this)">
+    <button class="btn-modal-cancel" style="margin-left:8px" id="btnEnviarArquivos" onclick="enviarArquivosProjeto()" disabled>Enviar arquivos</button>
+    <div id="uploadArquivosLog" style="margin-top:8px;font-size:11px;line-height:1.8"></div>`);
 }
-
-function _limparFallback() {
-  if (!confirm(`Limpar os ${records.length} registros do dia? Faça isso apenas após o CONSOLIDAR.bat ter sido executado com sucesso.`)) return;
-  records = [];
-  exportado = false;
-  localStorage.setItem(todayKey, JSON.stringify(records));
-  renderLog(); updateExportBar(); updateStats();
-  renderFazendas(currentNames);
-  renderPlano();
-  fecharConsolidar();
-  _pendingReload = true;
-  location.reload();
-}
-
-function _setConsolidarStatus(msg) {
-  document.getElementById('consolidarBody').innerHTML =
-    `<div style="color:var(--muted);font-size:13px">${msg}</div>`;
-}
-
-
-function _parseTimestampPtBr(s) {
-  const m = String(s).match(/(\d{2})\/(\d{2})\/(\d{4}),?\s*(\d{2}):(\d{2}):(\d{2})/);
-  if (!m) return new Date().toISOString();
-  const [, d, mo, y, h, mi, se] = m;
-  return new Date(`${y}-${mo}-${d}T${h}:${mi}:${se}`).toISOString();
-}
-
-async function consolidar() {
-  if (records.length === 0) return;
-  if (!currentUser) { openUserModal(); return; }
-
-  // Abre modal aguardando
-  document.getElementById('consolidarTitle').textContent = 'Consolidando...';
-  document.getElementById('consolidarBody').innerHTML =
-    '<div style="color:var(--muted);font-size:13px">Aguarde...</div>';
-  document.getElementById('consolidarActions').style.display = 'none';
-  const el = document.getElementById('consolidarOverlay');
-  el.style.display = '';
-  el.classList.add('open');
-
-  try {
-    // Mantém apenas o último registro de cada talhão
-    const porLayer = new Map();
-    for (const r of records) porLayer.set(r.layer, r);
-    const recsUnicos = [...porLayer.values()];
-
-    // ── 1. Atualiza a tabela programacao ──────────────────────────────
-    _setConsolidarStatus('Atualizando programação...');
-    const agora = new Date().toISOString();
-    await Promise.all(recsUnicos.map(async r => {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/programacao?layer=eq.${r.layer}`, {
-        method: 'PATCH',
-        headers: _sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
-        body: JSON.stringify({ status: r.status, tipo_linha: r.tipo, ciclo: r.ciclo, updated_at: agora }),
-      });
-      if (!res.ok) throw new Error(`programacao (layer ${r.layer}): ${res.status} ${await res.text()}`);
-    }));
-
-    // ── 2. Insere no log de exportações ───────────────────────────────
-    _setConsolidarStatus('Registrando histórico...');
-    const logRows = recsUnicos.map(r => ({
-      data_consolidacao: agora,
-      registrado_em: _parseTimestampPtBr(r.timestamp),
-      usuario: r.usuario, layer: r.layer, fazenda: r.fazenda, talhao: r.talhao,
-      tipo_linha: r.tipo, ciclo: r.ciclo, status: r.status,
-    }));
-    const logRes = await fetch(`${SUPABASE_URL}/rest/v1/log_exportacoes`, {
-      method: 'POST',
-      headers: _sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
-      body: JSON.stringify(logRows),
-    });
-    if (!logRes.ok) throw new Error(`log_exportacoes: ${logRes.status} ${await logRes.text()}`);
-
-    // ── 3. Atualiza ha acumulado do usuário ───────────────────────────
-    _setConsolidarStatus('Atualizando estatísticas do usuário...');
-    const haDelta = recsUnicos.reduce((s, r) => s + (r.ha || 0), 0);
-    const userRes = await fetch(`${SUPABASE_URL}/rest/v1/usuarios?nome=eq.${encodeURIComponent(currentUser)}&select=ha`,
-      { headers: _sbHeaders() });
-    const userRows = userRes.ok ? await userRes.json() : [];
-    const haAtual  = userRows[0]?.ha || 0;
-    const haNovo   = Math.round((haAtual + haDelta) * 100) / 100;
-    await fetch(`${SUPABASE_URL}/rest/v1/usuarios?nome=eq.${encodeURIComponent(currentUser)}`, {
-      method: 'PATCH',
-      headers: _sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
-      body: JSON.stringify({ ha: haNovo }),
-    });
-    USUARIOS_HA[currentUser] = haNovo;
-
-    // ── 4. Atualiza dados locais (sem precisar recarregar) ────────────
-    for (const r of recsUnicos) {
-      const td = FAZENDAS[r.fazenda]?.talhoes?.[String(r.talhao)];
-      if (td) { td.exp = r.status; td.tipo = r.tipo; td.ciclo = r.ciclo; }
-    }
-
-    const ha = totalHaRecords(records).toFixed(1);
-
-    // Monta a lista de arquivos obrigatórios: 4 por fazenda (Exp1L/Exp2L × dwg/zip)
-    const fazendasUnicas = [...new Set(recsUnicos.map(r => r.fazenda))];
-    _arquivosEsperados = [];
-    _arquivosSelecionados = [];
-    for (const faz of fazendasUnicas) {
-      const cod = String(FAZENDAS[faz]?.cod ?? '');
-        for (const {suf, ext} of [{suf:'Rev0',ext:'dwg'},{suf:'Exp0',ext:'zip'},{suf:'Rev0',ext:'pdf'}]) {
-          _arquivosEsperados.push({ cod, faz, suf, ext, nome: `${cod}_*_${suf}.${ext}`, ok: false, matched: null });
-        }
-    }
-
-    _abrirConsolidarModal('Consolidado com sucesso!', `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-        <div style="background:var(--surface2);border-radius:8px;padding:10px;text-align:center">
-          <div style="font-size:22px;font-weight:700;color:var(--green)">${recsUnicos.length}</div>
-          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Registros</div>
-        </div>
-        <div style="background:var(--surface2);border-radius:8px;padding:10px;text-align:center">
-          <div style="font-size:22px;font-weight:700;color:var(--accent)">${ha} ha</div>
-          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Área total</div>
-        </div>
-      </div>
-      <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
-        <div style="font-size:12px;font-weight:700;margin-bottom:6px">Arquivos de projeto obrigatórios (.dwg/.zip/.pdf)</div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
-          Selecione os ${_arquivosEsperados.length} arquivo(s) correspondentes aos itens abaixo (pode selecionar vários de uma vez), para liberar o envio e fechar.
-          O nome deve seguir o padrão <code>{COD_FAZ}_{NOME}_{Exp1L|Exp2L}.{dwg|zip}</code> (separado por "_") —
-          o nome da fazenda no meio pode variar, o sistema identifica pelo código e pelo sufixo.
-        </div>
-        <ul id="checklistArquivos" style="list-style:none;padding:0;margin:0 0 8px;font-size:11px;line-height:1.9">
-          ${_arquivosEsperados.map(a => `<li data-nome="${a.nome}">⬜ ${a.nome}</li>`).join('')}
-        </ul>
-        <input type="file" id="inputArquivosProjeto" accept=".dwg,.zip,.pdf" multiple onchange="_adicionarArquivoProjeto(this)">
-        <button class="btn-modal-cancel" style="margin-left:8px" id="btnEnviarArquivos" onclick="enviarArquivosProjeto()" disabled>Enviar arquivos</button>
-        <div id="uploadArquivosLog" style="margin-top:8px;font-size:11px;line-height:1.8"></div>
-      </div>`, false);
-    document.getElementById('btnFecharConsolidar').disabled = true;
-
-    records = [];
-    exportado = true;
-    _pendingReload = true;
-    localStorage.removeItem(todayKey);
-    renderLog(); updateExportBar(); updateStats();
-    renderFazendas(currentNames);
-    renderPlano(); renderDashboard();
-
-  } catch (e) {
-    _abrirConsolidarModal('Erro na consolidação',
-      `<p style="color:var(--red);font-size:13px;margin-bottom:10px">${e.message}</p>
-       <p style="font-size:12px;color:var(--muted)">Você pode baixar o XLSX como backup e tentar novamente mais tarde.</p>`,
-      true);
-  }
-}
-
 
 // ── Upload de arquivos de projeto (.dwg/.zip) para Releases do GitHub ─────
 // Via proxy (Cloudflare Worker) — ver RELEASE_PROXY_URL e cloudflare-worker/release-proxy.js.
@@ -2518,55 +2013,6 @@ async function enviarArquivosProjeto() {
   }
 }
 
-function openClearConfirm() {
-  const n  = records.length;
-  const ha = totalHaRecords(records);
-  document.getElementById('clearConfirmMsg').textContent =
-    `Apagar ${n} registro(s) de hoje (${ha.toFixed(1)} ha)?`;
-  document.getElementById('clearConfirmOverlay').classList.add('open');
-}
-function closeClearConfirm() {
-  document.getElementById('clearConfirmOverlay').classList.remove('open');
-}
-function confirmLimpar() {
-  closeClearConfirm();
-  records = [];
-  exportado = false;
-  localStorage.setItem(todayKey, JSON.stringify(records));
-  renderLog();
-  updateExportBar(); updateStats();
-  renderFazendas(currentNames);
-  renderPlano();
-  showToast('Registros limpos.');
-}
-
-function limparRegistros() {
-  openClearConfirm();
-}
-
-// ── Edit modal ────────────────────────────────────────────────────────────
-let editIdx = -1;
-function openEditModal(idx) {
-  editIdx = idx;
-  const r = records[idx];
-  document.getElementById('editTipo').value   = r.tipo;
-  document.getElementById('editCiclo').value  = r.ciclo;
-  document.getElementById('editStatus').value = r.status;
-  document.getElementById('editOverlay').classList.add('open');
-}
-function closeEditModal() {
-  document.getElementById('editOverlay').classList.remove('open');
-}
-function saveEdit() {
-  if (editIdx < 0) return;
-  records[editIdx].tipo   = document.getElementById('editTipo').value;
-  records[editIdx].ciclo  = document.getElementById('editCiclo').value;
-  records[editIdx].status = document.getElementById('editStatus').value;
-  localStorage.setItem(todayKey, JSON.stringify(records));
-  closeEditModal();
-  renderLog();
-  exportado = false;
-}
 
 // ── User management ───────────────────────────────────────────────────────
 
@@ -2627,14 +2073,11 @@ function renderUserChips() {
 }
 
 function selectUserChip(name) {
-  if (name !== currentUser && records.length > 0 && !exportado) {
-    if (!confirm(`Há ${records.length} registro(s) não exportados de "${currentUser}".\nTrocar para "${name}" agora? Os registros continuam salvos localmente.`)) return;
-  }
   closeUserModal();
   currentUser = name;
   localStorage.setItem('gf_user', name);
   updateUserBadge();
-  updateSubmitBtn();
+  updateSalvarBtn();
   applyUserPermissions(name);
 }
 
@@ -2752,7 +2195,6 @@ function setView(name) {
   document.getElementById('viewDashboard').style.display     = name === 'dashboard'    ? '' : 'none';
   document.getElementById('viewPreenchimento').style.display = name === 'preenchimento' ? '' : 'none';
   document.getElementById('viewConsulta').style.display      = name === 'consulta'     ? '' : 'none';
-  document.getElementById('exportBar').style.display         = name === 'preenchimento' ? '' : 'none';
   document.getElementById('tabDash').classList.toggle('active', name === 'dashboard');
   document.getElementById('tabWork').classList.toggle('active', name === 'preenchimento');
   document.getElementById('tabConsulta').classList.toggle('active', name === 'consulta');
@@ -2760,17 +2202,20 @@ function setView(name) {
   if (name === 'consulta')  { populateConsultaFilters(); renderConsulta(); }
 }
 
-// ── Status por fazenda ────────────────────────────────────────────────────
+// ── Status por fazenda (rollup do Projeto entre todos os talhões) ─────────
 function getFazStatus(name) {
   const tals = Object.values(FAZENDAS[name]?.talhoes || {});
-  if (!tals.length) return { status: '—', cls: 'muted', ciclo: '—' };
-  const total  = tals.length;
-  const done   = tals.filter(t => t.exp === 'CONCLUIDO' || t.exp === 'SEM LINHAS' || t.tipo === 'SEM LINHAS').length;
-  const ciclo  = tals.find(t => t.ciclo)?.ciclo || '—';
+  if (!tals.length) return { status: '—', cls: 'muted', ciclo: '—', sistConser: '' };
+  const total = tals.length;
+  const ok    = tals.filter(t => t.projeto === 'Ok').length;
+  const algum = tals.some(t => t.projeto === 'Andamento' || t.projeto === 'Ok');
+  const ciclo = tals.find(t => t.ciclo)?.ciclo || '—';
+  const sistConser = rollupSistConser(tals);
   let status, cls;
-  if (done === total)  { status = 'CONCLUÍDO'; cls = 'green'; }
-  else                 { status = 'A FAZER';   cls = 'blue';  }
-  return { status, cls, ciclo };
+  if (ok === total) { status = 'OK';        cls = 'green';  }
+  else if (algum)    { status = 'ANDAMENTO'; cls = 'accent'; }
+  else               { status = 'PENDENTE';  cls = 'blue';   }
+  return { status, cls, ciclo, sistConser };
 }
 
 // ── Plano da Semana ───────────────────────────────────────────────────────
@@ -2937,12 +2382,12 @@ function debouncedRenderConsulta() {
   _consultaDebounceTimer = setTimeout(renderConsulta, 200);
 }
 function populateConsultaFilters() {
-  const meses = new Set(), frentes = new Set();
+  const meses = new Set(), ambientes = new Set();
   FAZENDA_NAMES.forEach(n => {
     Object.values(FAZENDAS[n].talhoes).forEach(t => {
       const ym = talYM(t);
       if (ym) meses.add(ym);
-      if (t.frente) frentes.add(t.frente);
+      if (t.ambiente) ambientes.add(t.ambiente);
     });
   });
   const selMes = document.getElementById('cFiltroMes');
@@ -2955,17 +2400,17 @@ function populateConsultaFilters() {
     }).join('');
   selMes.value = curMes;
 
-  const selFre = document.getElementById('cFiltroFrente');
-  const curFre = selFre.value;
-  selFre.innerHTML = '<option value="">— todas as frentes —</option>' +
-    [...frentes].sort((a,b)=>a-b).map(f => `<option value="${f}">Frente ${f}</option>`).join('');
-  selFre.value = curFre;
+  const selAmb = document.getElementById('cFiltroAmbiente');
+  const curAmb = selAmb.value;
+  selAmb.innerHTML = '<option value="">— todos os ambientes —</option>' +
+    [...ambientes].sort().map(a => `<option value="${a}">${a}</option>`).join('');
+  selAmb.value = curAmb;
 }
 
 function limparFiltrosConsulta() {
-  document.getElementById('cFiltroMes').value    = '';
-  document.getElementById('cFiltroFrente').value = '';
-  document.getElementById('cFiltroStatus').value = '';
+  document.getElementById('cFiltroMes').value      = '';
+  document.getElementById('cFiltroAmbiente').value = '';
+  document.getElementById('cFiltroStatus').value   = '';
   renderConsulta();
 }
 
@@ -3023,21 +2468,21 @@ function renderConsulta(page) {
   if (page === undefined) { _consultaPage = 0; }
   else { _consultaPage = page; }
 
-  const q          = (document.getElementById('consultaSearch')?.value || '').toLowerCase();
-  const filtMes    = document.getElementById('cFiltroMes')?.value    || '';
-  const filtFrente = document.getElementById('cFiltroFrente')?.value || '';
-  const filtStatus = document.getElementById('cFiltroStatus')?.value || '';
+  const q           = (document.getElementById('consultaSearch')?.value || '').toLowerCase();
+  const filtMes     = document.getElementById('cFiltroMes')?.value      || '';
+  const filtAmbiente = document.getElementById('cFiltroAmbiente')?.value || '';
+  const filtStatus  = document.getElementById('cFiltroStatus')?.value   || '';
 
   document.getElementById('cFiltroMes').classList.toggle('active', !!filtMes);
-  document.getElementById('cFiltroFrente').classList.toggle('active', !!filtFrente);
+  document.getElementById('cFiltroAmbiente').classList.toggle('active', !!filtAmbiente);
   document.getElementById('cFiltroStatus').classList.toggle('active', !!filtStatus);
 
   let names = q
     ? FAZENDA_NAMES.filter(n => n.toLowerCase().includes(q) || String(FAZENDAS[n].cod).includes(q))
     : FAZENDA_NAMES;
 
-  if (filtFrente) names = names.filter(n =>
-    Object.values(FAZENDAS[n].talhoes).some(t => String(t.frente) === filtFrente));
+  if (filtAmbiente) names = names.filter(n =>
+    Object.values(FAZENDAS[n].talhoes).some(t => t.ambiente === filtAmbiente));
   if (filtMes) names = names.filter(n =>
     Object.values(FAZENDAS[n].talhoes).some(t => talYM(t) === filtMes));
   if (filtStatus) names = names.filter(n => getFazStatus(n).status === filtStatus);
@@ -3061,23 +2506,23 @@ function renderConsulta(page) {
     const d = FAZENDAS[name];
     const allTals = Object.values(d.talhoes);
     const tals = allTals.filter(t =>
-      (!filtMes    || talYM(t) === filtMes) &&
-      (!filtFrente || String(t.frente) === filtFrente)
+      (!filtMes      || talYM(t) === filtMes) &&
+      (!filtAmbiente || t.ambiente === filtAmbiente)
     );
     const totalTals = tals.length;
     const conc  = tals.filter(isTalDone).length;
     const { status, cls, ciclo } = getFazStatus(name);
-    const frentes = [...new Set(tals.map(t => t.frente).filter(Boolean))].sort((a,b)=>a-b).join(', ') || '—';
+    const ambientes = [...new Set(tals.map(t => t.ambiente).filter(Boolean))].sort().join(', ') || '—';
     const haTotal = tals.reduce((s, t) => s + (t.ha || 0), 0);
     const escName = name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
     const cbTd = _consultaSelectMode
       ? `<td class="consulta-cb" onclick="event.stopPropagation()"><input type="checkbox" ${_consultaSelected.has(name) ? 'checked' : ''} onclick="toggleConsultaSel('${escName}',this)"></td>`
       : '';
-    return `<tr class="consulta-faz-row${_consultaSelected.has(name) ? ' selected' : ''}" onclick="toggleFazDetail('${escName}',this,'${filtMes}','${filtFrente}')" oncontextmenu="openCtxMenu(event,'${escName}')" id="cfr-${CSS.escape(name)}">
+    return `<tr class="consulta-faz-row${_consultaSelected.has(name) ? ' selected' : ''}" onclick="toggleFazDetail('${escName}',this,'${filtMes}','${filtAmbiente}')" oncontextmenu="openCtxMenu(event,'${escName}')" id="cfr-${CSS.escape(name)}">
       ${cbTd}
       <td><span class="consulta-expand-icon" id="cfi-${CSS.escape(name)}">▶</span><strong>${name}</strong></td>
       <td style="font-family:monospace">${d.cod}</td>
-      <td>${frentes}</td>
+      <td>${ambientes}</td>
       <td><span class="faz-tag faz-tag-muted">${ciclo}</span></td>
       <td><span class="faz-tag faz-tag-${cls}">${status}</span></td>
       <td style="font-family:monospace">${conc}/${totalTals}</td>
@@ -3101,7 +2546,7 @@ function renderConsulta(page) {
     <table class="consulta-table">
       <thead><tr>
         ${_consultaSelectMode ? '<th style="width:36px"></th>' : ''}
-        <th>Fazenda</th><th>Cód</th><th>Frente</th><th>Ciclo</th>
+        <th>Fazenda</th><th>Cód</th><th>Ambiente</th><th>Ciclo</th>
         <th>Status</th><th>Talhões</th><th>Área</th>
       </tr></thead>
       <tbody>${rows}</tbody>
@@ -3110,7 +2555,7 @@ function renderConsulta(page) {
   </div>`;
 }
 
-function toggleFazDetail(name, rowEl, filtMesArg, filtFrenteArg) {
+function toggleFazDetail(name, rowEl, filtMesArg, filtAmbienteArg) {
   const esc = CSS.escape(name);
   const detailRow = document.getElementById('cdr-' + esc);
   const inner     = document.getElementById('cdinner-' + esc);
@@ -3134,35 +2579,34 @@ function toggleFazDetail(name, rowEl, filtMesArg, filtFrenteArg) {
   const allTals = FAZENDAS[name].talhoes;
   const sorted = Object.keys(allTals).sort((a, b) => +a - +b).filter(t => {
     const td = allTals[t];
-    return (!filtMesArg    || talYM(td) === filtMesArg) &&
-           (!filtFrenteArg || String(td.frente) === filtFrenteArg);
+    return (!filtMesArg      || talYM(td) === filtMesArg) &&
+           (!filtAmbienteArg || td.ambiente === filtAmbienteArg);
   });
   const talRows = sorted.map(t => {
     const td = allTals[t];
-    const stCls = isTalDone(td) ? (td.exp === 'CONCLUIDO' ? 'green' : 'muted') : 'blue';
-    const stLbl = td.exp === 'CONCLUIDO' ? 'Concluído' : (td.exp === 'SEM LINHAS' || td.tipo === 'SEM LINHAS') ? 'Sem Linhas' : 'A Fazer';
+    const stCls = td.projeto === 'Ok' ? 'green' : td.projeto === 'Andamento' ? 'accent' : 'blue';
     const _ym   = talYM(td);
     const data  = _ym ? _ym.split('-').reverse().join('/') : '—';
     return `<tr>
       <td style="font-family:monospace;font-weight:700">${t}</td>
-      <td>${td.tipo || '—'}</td>
-      <td><span class="faz-tag faz-tag-${stCls}" style="font-size:10px">${stLbl}</span></td>
+      <td>${td.sistConser || '—'}</td>
+      <td><span class="faz-tag faz-tag-${stCls}" style="font-size:10px">${td.projeto}</span></td>
       <td style="font-family:monospace">${(td.ha || 0).toFixed(1)} ha</td>
-      <td>${td.estagio || '—'}</td>
+      <td>${td.mapeamento || '—'}</td>
       <td style="font-family:monospace">${data}</td>
     </tr>`;
   }).join('');
 
   inner.innerHTML = `<table class="consulta-detail-table">
     <thead><tr>
-      <th>Talhão</th><th>Tipo</th><th>Status</th><th>Área</th><th>Estágio</th><th>Mês</th>
+      <th>Talhão</th><th>Sist. Conser.</th><th>Projeto</th><th>Área</th><th>Mapeamento</th><th>Mês</th>
     </tr></thead>
     <tbody>${talRows}</tbody>
   </table>`;
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────
-let _chartFrente = null, _chartMes = null, _chartUsuario = null, _chart18m = null;
+let _chartAmbiente = null, _chartMes = null, _chartUsuario = null, _chartMapeamento = null;
 
 function getThemeColors() {
   const s = getComputedStyle(document.documentElement);
@@ -3179,14 +2623,14 @@ function getThemeColors() {
 }
 
 function isTalDone(t) {
-  return t.exp === 'CONCLUIDO' || t.exp === 'SEM LINHAS' || t.tipo === 'SEM LINHAS';
+  return t.projeto === 'Ok';
 }
 
 function computeDash() {
-  let haTotal = 0, haConc = 0, haFazer = 0, haSemLin = 0;
+  let haTotal = 0, haConc = 0, haFazer = 0, haAndamento = 0;
   let fazConc = 0;
-  let ha18Total = 0, ha18Conc = 0, ha18Fazer = 0;
-  const byFrente = {}, byMonth = {};
+  let haMapTotal = 0, haMapConc = 0, haMapFazer = 0;
+  const byAmbiente = {}, byMonth = {};
 
   FAZENDA_NAMES.forEach(name => {
     const tals = Object.values(FAZENDAS[name].talhoes);
@@ -3195,16 +2639,15 @@ function computeDash() {
 
     tals.forEach(t => {
       const ha = t.ha || 0;
-      const semLin = t.exp === 'SEM LINHAS' || t.tipo === 'SEM LINHAS';
       haTotal += ha;
-      if (semLin)              haSemLin += ha;
+      if (t.projeto === 'Andamento') haAndamento += ha;
       if (isTalDone(t))        haConc   += ha;
       else                     haFazer  += ha;
 
       {
-        const f = t.frente ? 'Frente ' + t.frente : 'Indefinida';
-        if (!byFrente[f]) byFrente[f] = { conc: 0, fazer: 0 };
-        isTalDone(t) ? byFrente[f].conc += ha : byFrente[f].fazer += ha;
+        const a = t.ambiente || 'Indefinido';
+        if (!byAmbiente[a]) byAmbiente[a] = { conc: 0, fazer: 0 };
+        isTalDone(t) ? byAmbiente[a].conc += ha : byAmbiente[a].fazer += ha;
       }
 
       {
@@ -3214,20 +2657,20 @@ function computeDash() {
         if (isTalDone(t)) byMonth[ym].conc += ha;
       }
 
-      if (is18m(t.estagio)) {
-        ha18Total += ha;
-        if (isTalDone(t)) ha18Conc += ha;
-        else              ha18Fazer += ha;
+      if (precisaMapeamento(t.sistConser)) {
+        haMapTotal += ha;
+        if (t.mapeamento === 'Sim') haMapConc += ha;
+        else                        haMapFazer += ha;
       }
     });
   });
 
   return {
-    haTotal, haConc, haFazer, haSemLin,
+    haTotal, haConc, haFazer, haAndamento,
     fazTotal: FAZENDA_NAMES.length, fazConc,
     pct: haTotal > 0 ? Math.round(haConc / haTotal * 100) : 0,
-    byFrente, byMonth,
-    ha18Total, ha18Conc, ha18Fazer
+    byAmbiente, byMonth,
+    haMapTotal, haMapConc, haMapFazer
   };
 }
 
@@ -3252,7 +2695,7 @@ function renderDashboard() {
     { label: 'Área Total',     val: fmtHa(d.haTotal), sub: 'hectares programados', cls: '' },
     { label: 'Ha Concluído',   val: fmtHa(d.haConc),  sub: `${d.pct}% do total`, cls: 'green' },
     { label: 'Ha A Fazer',     val: fmtHa(d.haFazer), sub: 'hectares restantes', cls: 'blue' },
-    { label: 'Ha Sem Linhas',  val: fmtHa(d.haSemLin),sub: 'incluído em concluído', cls: 'accent' },
+    { label: 'Ha Andamento',   val: fmtHa(d.haAndamento), sub: 'projeto em andamento', cls: 'accent' },
   ].map(k => `<div class="dash-kpi-card${k.cls ? ' ' + k.cls : ''}">
     <div class="dash-kpi-label">${k.label}</div>
     <div class="dash-kpi-value">${k.val}</div>
@@ -3310,25 +2753,23 @@ function renderDashboard() {
     }
   });
 
-  // ── Ha por Frente (barras horizontais, ordenado por total desc) ──────────
-  const fLabels = Object.keys(d.byFrente).sort((a, b) => {
-    if (a === 'Indefinida') return 1;
-    if (b === 'Indefinida') return -1;
-    const na = parseInt(a.replace('Frente ', '')) || 0;
-    const nb = parseInt(b.replace('Frente ', '')) || 0;
-    return na - nb;
+  // ── Ha por Ambiente (barras horizontais) ──────────────────────────────────
+  const aLabels = Object.keys(d.byAmbiente).sort((a, b) => {
+    if (a === 'Indefinido') return 1;
+    if (b === 'Indefinido') return -1;
+    return a.localeCompare(b);
   });
-  if (_chartFrente) _chartFrente.destroy();
-  _chartFrente = new Chart(document.getElementById('chartFrente'), {
+  if (_chartAmbiente) _chartAmbiente.destroy();
+  _chartAmbiente = new Chart(document.getElementById('chartAmbiente'), {
     type: 'bar',
     data: {
-      labels: fLabels,
+      labels: aLabels,
       datasets: [
-        { label: 'Concluído', data: fLabels.map(f => +d.byFrente[f].conc.toFixed(0)),
+        { label: 'Concluído', data: aLabels.map(a => +d.byAmbiente[a].conc.toFixed(0)),
           backgroundColor: c.green + 'BB', maxBarThickness: 32,
           borderRadius: { topLeft: 5, bottomLeft: 5, topRight: 0, bottomRight: 0 },
           borderSkipped: 'right' },
-        { label: 'A Fazer',   data: fLabels.map(f => +d.byFrente[f].fazer.toFixed(0)),
+        { label: 'A Fazer',   data: aLabels.map(a => +d.byAmbiente[a].fazer.toFixed(0)),
           backgroundColor: c.blue  + 'BB', maxBarThickness: 32,
           borderRadius: { topLeft: 0, bottomLeft: 0, topRight: 5, bottomRight: 5 },
           borderSkipped: 'left' },
@@ -3379,15 +2820,15 @@ function renderDashboard() {
     });
   }
 
-  // ── Talhões 18m ─────────────────────────────────────────────────────────
-  if (_chart18m) _chart18m.destroy();
-  _chart18m = new Chart(document.getElementById('chart18m'), {
+  // ── Talhões que precisam Mapeamento (EMBUTIDO/INTERCALADA) ────────────────
+  if (_chartMapeamento) _chartMapeamento.destroy();
+  _chartMapeamento = new Chart(document.getElementById('chartMapeamento'), {
     type: 'bar',
     data: {
-      labels: ['Total 18m', 'Concluído', 'A Fazer'],
+      labels: ['Precisa Mapeamento', 'Mapeado', 'Falta Mapear'],
       datasets: [{
         label: 'Hectares',
-        data: [d.ha18Total, d.ha18Conc, d.ha18Fazer],
+        data: [d.haMapTotal, d.haMapConc, d.haMapFazer],
         backgroundColor: [c.muted + '77', c.green + 'BB', c.blue + 'BB'],
         borderColor:     [c.muted, c.green, c.blue],
         borderWidth: 1.5, borderRadius: 6, borderSkipped: false,

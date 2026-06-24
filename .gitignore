@@ -1,0 +1,23 @@
+# Config local de permissões do Claude Code (por máquina/sessão)
+.claude/settings.local.json
+
+# Dados de runtime / estado local da engine (não vão para o git)
+__pycache__/
+*.pyc
+sistema_preenchimento/logs/*.log
+
+# Bases de dados de entrada (grandes, atualizadas fora do git)
+sistema_preenchimento/base_plantio/*.xlsx
+sistema_preenchimento/base_preparo/*.xlsx
+sistema_preenchimento/base_fazendas/*.xls*
+
+# Config local do Supabase para a engine (ver supabase_config.example.json)
+sistema_preenchimento/supabase_config.json
+sistema_preenchimento/supabase/.temp
+sistema_preenchimento/supabase/.branches
+
+# Senha da planilha de Plantio (ver planilha_config.example.json)
+sistema_preenchimento/planilha_config.json
+
+# Arquivos temporários da sincronização (save-as + os.replace)
+sistema_preenchimento/base_plantio/*.sync_tmp.xlsx
