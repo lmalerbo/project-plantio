@@ -119,52 +119,52 @@ else:
                 pass
         print(f"  {len(layer_ha)} talhões na base fazendas.\n")
 
-# ── 3. Ler aba CONSERVAÇÃO da planilha de Preparo (Sist. Conser. por talhão) ──
-print("Lendo planilha de preparo (aba CONSERVAÇÃO)...")
+# ── 3. Ler aba CONSERVAÇÃO de todas as planilhas de Preparo (Sist. Conser. por talhão) ──
+# Pode haver mais de um arquivo aqui (ex: ano-safra atual + histórico de ano-safra
+# anterior, divididos em arquivos separados) — lê todos e funde num único lookup.
+print("Lendo planilha(s) de preparo (aba CONSERVAÇÃO)...")
 _preparo_found = _glob.glob("base_preparo/*.xlsx")
 if not _preparo_found:
     print("ERRO: Nenhum arquivo .xlsx encontrado em base_preparo/")
     fechar_log(_log_fh)
     input("\nPressione Enter para sair...")
     sys.exit(1)
-SOURCE_PREPARO = _preparo_found[0]
-print(f"  Planilha de preparo: {SOURCE_PREPARO}")
-
-wb_preparo = openpyxl.load_workbook(SOURCE_PREPARO, data_only=True)
-sheet_cons = next((n for n in wb_preparo.sheetnames if norm_header(n) == 'CONSERVACAO'), None)
-if not sheet_cons:
-    print(f"ERRO: Aba 'CONSERVAÇÃO' não encontrada. Abas disponíveis: {wb_preparo.sheetnames}")
-    fechar_log(_log_fh)
-    input("\nPressione Enter para sair...")
-    sys.exit(1)
-ws_cons = wb_preparo[sheet_cons]
-
-header_row, hmap = achar_header(ws_cons, ['SECAO', 'TALHAO', 'SISTEMA DE CONSERVACAO'])
-if header_row is None:
-    print(f"ERRO: Cabeçalho (SEÇÃO/TALHÃO/SISTEMA DE CONSERVAÇÃO) não encontrado na aba '{sheet_cons}'.")
-    fechar_log(_log_fh)
-    input("\nPressione Enter para sair...")
-    sys.exit(1)
-
-idx_cod_cons = hmap['SECAO']
-idx_tal_cons = hmap['TALHAO']
-idx_sc       = hmap['SISTEMA DE CONSERVACAO']
 
 sist_conser_por_layer = {}   # (cod_faz, talhao) → sist_conser
-for row in ws_cons.iter_rows(min_row=header_row + 1, max_row=ws_cons.max_row, values_only=True):
-    cod_raw = row[idx_cod_cons] if idx_cod_cons < len(row) else None
-    tal_raw = row[idx_tal_cons] if idx_tal_cons < len(row) else None
-    sc_raw  = row[idx_sc] if idx_sc < len(row) else None
-    if cod_raw is None or tal_raw is None:
+for SOURCE_PREPARO in _preparo_found:
+    print(f"  Planilha de preparo: {SOURCE_PREPARO}")
+    wb_preparo = openpyxl.load_workbook(SOURCE_PREPARO, data_only=True)
+    sheet_cons = next((n for n in wb_preparo.sheetnames if norm_header(n) == 'CONSERVACAO'), None)
+    if not sheet_cons:
+        print(f"  ⚠  Aba 'CONSERVAÇÃO' não encontrada em {SOURCE_PREPARO} (abas: {wb_preparo.sheetnames}) — ignorada.")
         continue
-    try:
-        cod_faz = int(cod_raw)
-        talhao  = int(tal_raw)
-    except (ValueError, TypeError):
-        continue
-    sist_conser_por_layer[(cod_faz, talhao)] = str(sc_raw).strip().upper() if sc_raw else '-'
+    ws_cons = wb_preparo[sheet_cons]
 
-print(f"  {len(sist_conser_por_layer)} talhão(ões) com Sist. Conser. na base de preparo.\n")
+    header_row, hmap = achar_header(ws_cons, ['SECAO', 'TALHAO', 'SISTEMA DE CONSERVACAO'])
+    if header_row is None:
+        print(f"  ⚠  Cabeçalho (SEÇÃO/TALHÃO/SISTEMA DE CONSERVAÇÃO) não encontrado em {SOURCE_PREPARO} — ignorada.")
+        continue
+
+    idx_cod_cons = hmap['SECAO']
+    idx_tal_cons = hmap['TALHAO']
+    idx_sc       = hmap['SISTEMA DE CONSERVACAO']
+
+    n_antes = len(sist_conser_por_layer)
+    for row in ws_cons.iter_rows(min_row=header_row + 1, max_row=ws_cons.max_row, values_only=True):
+        cod_raw = row[idx_cod_cons] if idx_cod_cons < len(row) else None
+        tal_raw = row[idx_tal_cons] if idx_tal_cons < len(row) else None
+        sc_raw  = row[idx_sc] if idx_sc < len(row) else None
+        if cod_raw is None or tal_raw is None:
+            continue
+        try:
+            cod_faz = int(cod_raw)
+            talhao  = int(tal_raw)
+        except (ValueError, TypeError):
+            continue
+        sist_conser_por_layer[(cod_faz, talhao)] = str(sc_raw).strip().upper() if sc_raw else '-'
+    print(f"    {len(sist_conser_por_layer) - n_antes} talhão(ões) novo(s)/atualizado(s).")
+
+print(f"  {len(sist_conser_por_layer)} talhão(ões) com Sist. Conser. no total (todas as planilhas de preparo).\n")
 
 # ── 4. Ler aba Sequencia da planilha de Plantio (demanda, blocos de talhões) ──
 print("Lendo planilha de Sequência de Plantio (aba Sequencia)...")

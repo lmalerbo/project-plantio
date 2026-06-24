@@ -937,17 +937,15 @@
       <span class="dash-progress-pct" id="dashProgressPct">0%</span>
     </div>
 
-    <!-- Linha: Ha por Mês + Ha por Ambiente -->
+    <!-- Linha: Ha por Mês + Situação de Prazo -->
     <div class="dash-charts-flex">
       <div class="dash-chart-card">
         <div class="dash-chart-title">Ha Programado por Mês de Plantio</div>
         <canvas id="chartMes" height="220"></canvas>
       </div>
-      <div class="dash-chart-card" style="overflow:hidden; min-width:0; display:flex; flex-direction:column">
-        <div class="dash-chart-title">Ha por Ambiente</div>
-        <div id="chartAmbienteWrap" style="position:relative; width:100%; flex:1; min-height:180px">
-          <canvas id="chartAmbiente"></canvas>
-        </div>
+      <div class="dash-chart-card">
+        <div class="dash-chart-title">Situação de Prazo</div>
+        <canvas id="chartPrazo" height="220"></canvas>
       </div>
     </div>
 
@@ -992,7 +990,7 @@
     <!-- Cards de resumo -->
     <div class="stats-row">
       <div class="stat-card">
-        <div class="stat-label" id="statLabel1">Base ICOL</div>
+        <div class="stat-label" id="statLabel1">Demanda Plantio</div>
         <div class="stat-value" id="statFazendas">—</div>
         <div class="stat-sub" id="statTalhoes">—</div>
       </div>
@@ -1130,9 +1128,6 @@
       <span class="faz-filter-label">Filtro:</span>
       <select id="cFiltroMes" class="mes-filter-select" onchange="renderConsulta()">
         <option value="">— todos os meses —</option>
-      </select>
-      <select id="cFiltroAmbiente" class="mes-filter-select" onchange="renderConsulta()">
-        <option value="">— todos os ambientes —</option>
       </select>
       <select id="cFiltroStatus" class="mes-filter-select" onchange="renderConsulta()">
         <option value="">— todos os status —</option>
@@ -2382,12 +2377,11 @@ function debouncedRenderConsulta() {
   _consultaDebounceTimer = setTimeout(renderConsulta, 200);
 }
 function populateConsultaFilters() {
-  const meses = new Set(), ambientes = new Set();
+  const meses = new Set();
   FAZENDA_NAMES.forEach(n => {
     Object.values(FAZENDAS[n].talhoes).forEach(t => {
       const ym = talYM(t);
       if (ym) meses.add(ym);
-      if (t.ambiente) ambientes.add(t.ambiente);
     });
   });
   const selMes = document.getElementById('cFiltroMes');
@@ -2399,17 +2393,10 @@ function populateConsultaFilters() {
       return `<option value="${ym}">${nome.charAt(0).toUpperCase() + nome.slice(1)}</option>`;
     }).join('');
   selMes.value = curMes;
-
-  const selAmb = document.getElementById('cFiltroAmbiente');
-  const curAmb = selAmb.value;
-  selAmb.innerHTML = '<option value="">— todos os ambientes —</option>' +
-    [...ambientes].sort().map(a => `<option value="${a}">${a}</option>`).join('');
-  selAmb.value = curAmb;
 }
 
 function limparFiltrosConsulta() {
   document.getElementById('cFiltroMes').value      = '';
-  document.getElementById('cFiltroAmbiente').value = '';
   document.getElementById('cFiltroStatus').value   = '';
   renderConsulta();
 }
@@ -2470,19 +2457,15 @@ function renderConsulta(page) {
 
   const q           = (document.getElementById('consultaSearch')?.value || '').toLowerCase();
   const filtMes     = document.getElementById('cFiltroMes')?.value      || '';
-  const filtAmbiente = document.getElementById('cFiltroAmbiente')?.value || '';
   const filtStatus  = document.getElementById('cFiltroStatus')?.value   || '';
 
   document.getElementById('cFiltroMes').classList.toggle('active', !!filtMes);
-  document.getElementById('cFiltroAmbiente').classList.toggle('active', !!filtAmbiente);
   document.getElementById('cFiltroStatus').classList.toggle('active', !!filtStatus);
 
   let names = q
     ? FAZENDA_NAMES.filter(n => n.toLowerCase().includes(q) || String(FAZENDAS[n].cod).includes(q))
     : FAZENDA_NAMES;
 
-  if (filtAmbiente) names = names.filter(n =>
-    Object.values(FAZENDAS[n].talhoes).some(t => t.ambiente === filtAmbiente));
   if (filtMes) names = names.filter(n =>
     Object.values(FAZENDAS[n].talhoes).some(t => talYM(t) === filtMes));
   if (filtStatus) names = names.filter(n => getFazStatus(n).status === filtStatus);
@@ -2505,31 +2488,26 @@ function renderConsulta(page) {
   const rows = pageNames.map(name => {
     const d = FAZENDAS[name];
     const allTals = Object.values(d.talhoes);
-    const tals = allTals.filter(t =>
-      (!filtMes      || talYM(t) === filtMes) &&
-      (!filtAmbiente || t.ambiente === filtAmbiente)
-    );
+    const tals = allTals.filter(t => !filtMes || talYM(t) === filtMes);
     const totalTals = tals.length;
     const conc  = tals.filter(isTalDone).length;
     const { status, cls, ciclo } = getFazStatus(name);
-    const ambientes = [...new Set(tals.map(t => t.ambiente).filter(Boolean))].sort().join(', ') || '—';
     const haTotal = tals.reduce((s, t) => s + (t.ha || 0), 0);
     const escName = name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
     const cbTd = _consultaSelectMode
       ? `<td class="consulta-cb" onclick="event.stopPropagation()"><input type="checkbox" ${_consultaSelected.has(name) ? 'checked' : ''} onclick="toggleConsultaSel('${escName}',this)"></td>`
       : '';
-    return `<tr class="consulta-faz-row${_consultaSelected.has(name) ? ' selected' : ''}" onclick="toggleFazDetail('${escName}',this,'${filtMes}','${filtAmbiente}')" oncontextmenu="openCtxMenu(event,'${escName}')" id="cfr-${CSS.escape(name)}">
+    return `<tr class="consulta-faz-row${_consultaSelected.has(name) ? ' selected' : ''}" onclick="toggleFazDetail('${escName}',this,'${filtMes}')" oncontextmenu="openCtxMenu(event,'${escName}')" id="cfr-${CSS.escape(name)}">
       ${cbTd}
       <td><span class="consulta-expand-icon" id="cfi-${CSS.escape(name)}">▶</span><strong>${name}</strong></td>
       <td style="font-family:monospace">${d.cod}</td>
-      <td>${ambientes}</td>
       <td><span class="faz-tag faz-tag-muted">${ciclo}</span></td>
       <td><span class="faz-tag faz-tag-${cls}">${status}</span></td>
       <td style="font-family:monospace">${conc}/${totalTals}</td>
       <td style="font-family:monospace">${haTotal.toFixed(1)} ha</td>
     </tr>
     <tr id="cdr-${CSS.escape(name)}" style="display:none">
-      <td colspan="${_consultaSelectMode ? 8 : 7}"><div class="consulta-detail-inner" id="cdinner-${CSS.escape(name)}"></div></td>
+      <td colspan="${_consultaSelectMode ? 7 : 6}"><div class="consulta-detail-inner" id="cdinner-${CSS.escape(name)}"></div></td>
     </tr>`;
   }).join('');
 
@@ -2546,7 +2524,7 @@ function renderConsulta(page) {
     <table class="consulta-table">
       <thead><tr>
         ${_consultaSelectMode ? '<th style="width:36px"></th>' : ''}
-        <th>Fazenda</th><th>Cód</th><th>Ambiente</th><th>Ciclo</th>
+        <th>Fazenda</th><th>Cód</th><th>Ciclo</th>
         <th>Status</th><th>Talhões</th><th>Área</th>
       </tr></thead>
       <tbody>${rows}</tbody>
@@ -2555,7 +2533,7 @@ function renderConsulta(page) {
   </div>`;
 }
 
-function toggleFazDetail(name, rowEl, filtMesArg, filtAmbienteArg) {
+function toggleFazDetail(name, rowEl, filtMesArg) {
   const esc = CSS.escape(name);
   const detailRow = document.getElementById('cdr-' + esc);
   const inner     = document.getElementById('cdinner-' + esc);
@@ -2579,8 +2557,7 @@ function toggleFazDetail(name, rowEl, filtMesArg, filtAmbienteArg) {
   const allTals = FAZENDAS[name].talhoes;
   const sorted = Object.keys(allTals).sort((a, b) => +a - +b).filter(t => {
     const td = allTals[t];
-    return (!filtMesArg      || talYM(td) === filtMesArg) &&
-           (!filtAmbienteArg || td.ambiente === filtAmbienteArg);
+    return !filtMesArg || talYM(td) === filtMesArg;
   });
   const talRows = sorted.map(t => {
     const td = allTals[t];
@@ -2606,7 +2583,7 @@ function toggleFazDetail(name, rowEl, filtMesArg, filtAmbienteArg) {
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────
-let _chartAmbiente = null, _chartMes = null, _chartUsuario = null, _chartMapeamento = null;
+let _chartPrazo = null, _chartMes = null, _chartUsuario = null, _chartMapeamento = null;
 
 function getThemeColors() {
   const s = getComputedStyle(document.documentElement);
@@ -2614,6 +2591,7 @@ function getThemeColors() {
     green:  s.getPropertyValue('--green').trim()   || '#4CAF72',
     accent: s.getPropertyValue('--accent').trim()  || '#C8960C',
     blue:   s.getPropertyValue('--blue').trim()    || '#5A9FD4',
+    red:    s.getPropertyValue('--red').trim()     || '#D95C5C',
     muted:  s.getPropertyValue('--muted').trim()   || '#7A8875',
     text:   s.getPropertyValue('--text').trim()    || '#E5EAE0',
     border: s.getPropertyValue('--border').trim()  || '#36422F',
@@ -2630,7 +2608,9 @@ function computeDash() {
   let haTotal = 0, haConc = 0, haFazer = 0, haAndamento = 0;
   let fazConc = 0;
   let haMapTotal = 0, haMapConc = 0, haMapFazer = 0;
-  const byAmbiente = {}, byMonth = {};
+  let haAtrasado = 0, haNoPrazo = 0;
+  const byMonth = {};
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
 
   FAZENDA_NAMES.forEach(name => {
     const tals = Object.values(FAZENDAS[name].talhoes);
@@ -2644,10 +2624,9 @@ function computeDash() {
       if (isTalDone(t))        haConc   += ha;
       else                     haFazer  += ha;
 
-      {
-        const a = t.ambiente || 'Indefinido';
-        if (!byAmbiente[a]) byAmbiente[a] = { conc: 0, fazer: 0 };
-        isTalDone(t) ? byAmbiente[a].conc += ha : byAmbiente[a].fazer += ha;
+      if (!isTalDone(t)) {
+        const venceu = t.mesPlantio && new Date(t.mesPlantio) < hoje;
+        venceu ? haAtrasado += ha : haNoPrazo += ha;
       }
 
       {
@@ -2669,8 +2648,9 @@ function computeDash() {
     haTotal, haConc, haFazer, haAndamento,
     fazTotal: FAZENDA_NAMES.length, fazConc,
     pct: haTotal > 0 ? Math.round(haConc / haTotal * 100) : 0,
-    byAmbiente, byMonth,
-    haMapTotal, haMapConc, haMapFazer
+    byMonth,
+    haMapTotal, haMapConc, haMapFazer,
+    haAtrasado, haNoPrazo
   };
 }
 
@@ -2753,38 +2733,30 @@ function renderDashboard() {
     }
   });
 
-  // ── Ha por Ambiente (barras horizontais) ──────────────────────────────────
-  const aLabels = Object.keys(d.byAmbiente).sort((a, b) => {
-    if (a === 'Indefinido') return 1;
-    if (b === 'Indefinido') return -1;
-    return a.localeCompare(b);
-  });
-  if (_chartAmbiente) _chartAmbiente.destroy();
-  _chartAmbiente = new Chart(document.getElementById('chartAmbiente'), {
+  // ── Situação de prazo (Atrasado = Mês de Plantio já passou e Projeto != Ok) ──
+  if (_chartPrazo) _chartPrazo.destroy();
+  _chartPrazo = new Chart(document.getElementById('chartPrazo'), {
     type: 'bar',
     data: {
-      labels: aLabels,
-      datasets: [
-        { label: 'Concluído', data: aLabels.map(a => +d.byAmbiente[a].conc.toFixed(0)),
-          backgroundColor: c.green + 'BB', maxBarThickness: 32,
-          borderRadius: { topLeft: 5, bottomLeft: 5, topRight: 0, bottomRight: 0 },
-          borderSkipped: 'right' },
-        { label: 'A Fazer',   data: aLabels.map(a => +d.byAmbiente[a].fazer.toFixed(0)),
-          backgroundColor: c.blue  + 'BB', maxBarThickness: 32,
-          borderRadius: { topLeft: 0, bottomLeft: 0, topRight: 5, bottomRight: 5 },
-          borderSkipped: 'left' },
-      ]
+      labels: ['Atrasado', 'No prazo', 'Concluído'],
+      datasets: [{
+        label: 'Hectares',
+        data: [d.haAtrasado, d.haNoPrazo, d.haConc],
+        backgroundColor: [c.red + 'BB', c.blue + 'BB', c.green + 'BB'],
+        borderColor:     [c.red, c.blue, c.green],
+        borderWidth: 1.5, borderRadius: 6, borderSkipped: false,
+      }]
     },
     options: {
-      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      responsive: true,
       scales: {
-        x: { stacked: true, grid: { color: gridLine }, ticks: { font: { size: 11 } },
-             title: { display: true, text: 'Hectares', font: { size: 11 } } },
-        y: { stacked: true, grid: { display: false }, ticks: { font: { size: 12, weight: '600' } } }
+        x: { grid: { display: false }, ticks: { font: { size: 13, weight: '600' } } },
+        y: { grid: { color: gridLine }, ticks: { font: { size: 11 } },
+             title: { display: true, text: 'Hectares', font: { size: 11 } } }
       },
       plugins: {
-        legend: { position: 'bottom', labels: { padding: 18, font: { size: 12 }, boxWidth: 12, boxHeight: 12 } },
-        tooltip: { callbacks: { label: ctx => fmtTooltip(ctx.dataset.label, ctx.raw) } }
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.raw.toLocaleString('pt-BR',{maximumFractionDigits:0})} ha` } }
       }
     }
   });
