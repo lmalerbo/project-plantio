@@ -1253,7 +1253,7 @@ let activeFilters = new Set();
 // ── Upload de arquivos de projeto (.dwg/.zip) para Releases do GitHub ─────
 // Feito via proxy (Cloudflare Worker) — o token do GitHub fica guardado lá como
 // secret, nunca neste arquivo (que é público). Ver cloudflare-worker/release-proxy.js.
-const RELEASE_PROXY_URL = 'PLACEHOLDER_PLANTIO_PROXY_URL';
+const RELEASE_PROXY_URL = 'https://project-plantio-proxy.leonardo-malerbo.workers.dev';
 const RE_ARQ_PROJETO = /^(\d+)_.+_(Rev\d+|Exp\d+)\.(dwg|zip|pdf)$/i;
 
 // ── Banco de dados (Supabase) ─────────────────────────────────────────────
