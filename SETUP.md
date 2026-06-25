@@ -27,7 +27,11 @@ project-plantio/
     │   └── release-proxy.js               ← Worker Cloudflare (upload para Releases)
     └── supabase/
         └── migrations/
-            └── 20260624120000_plantio_schema_init.sql  ← cria o schema "plantio" (ver seção 2 e 5)
+            ├── 20260624120000_plantio_schema_init.sql        ← cria o schema "plantio" (ver seção 2 e 5)
+            ├── 20260624140000_plantio_grant_sequences.sql    ← grant em sequences (faltava na primeira)
+            ├── 20260625000000_plantio_secure_writes.sql      ← funções RPC (registrar_bloco/usuarios)
+            ├── 20260625000100_plantio_lock_down_anon.sql     ← revoga insert/update/delete do anon
+            └── 20260625000200_plantio_grant_service_role.sql ← grants pra service_role (engine local)
 ```
 
 ## 1. GitHub — configurar Pages
@@ -64,7 +68,14 @@ nunca cria/altera nada em `public`, que pertence ao preparo.
    As chamadas já incluem os headers `Accept-Profile`/`Content-Profile: plantio` (ver `_sbHeaders`
    em `formulario.html` e `SB_HEADERS` na engine) — é isso que direciona pro schema certo.
 5. Copie `sistema_preenchimento/supabase_config.example.json` para `sistema_preenchimento/supabase_config.json`
-   com a mesma URL/key — é o que `ATUALIZAR.bat`/`SINCRONIZAR_PLANILHA.bat` usam (nunca commitar esse arquivo).
+   — mas **não use a mesma key do navegador aqui**. Desde a migration `20260625000100`, o role `anon`
+   (a publishable key, pública, embutida no `formulario.html`) só tem `select` direto e as 3 funções RPC
+   (`registrar_bloco`/`upsert_usuario`/`remover_usuario`) — não consegue mais inserir/atualizar linha
+   nenhuma diretamente. A engine (`ATUALIZAR.bat`/`SINCRONIZAR_PLANILHA.bat`) precisa da **service_role
+   key** (Settings → API → Project API keys → revele "service_role") nesse arquivo, já que ela faz
+   upsert em massa direto nas tabelas. Essa key ignora RLS mas **não dispensa o grant de schema/tabela**
+   — é por isso que existe a migration `20260625000200` (grant explícito pra `service_role`). Nunca
+   coloque a service_role key no `formulario.html` (é pública) nem comite `supabase_config.json`.
 
 ## 3. Cloudflare Worker — proxy de upload
 
@@ -110,6 +121,23 @@ ver comentário no topo do arquivo de migration).
 `Projeto` poder avançar de Pendente — o formulário já aplica esse bloqueio automaticamente. Blocos
 `Base larga`/vazio não têm o que mapear — `Mapeamento` já nasce/fica `Sim` automaticamente (engine
 e formulário) e o toggle correspondente fica travado.
+
+### Segurança: o que a publishable key (anon) pode fazer
+
+A key embutida no `formulario.html` é pública por natureza — qualquer um que abrir a página a vê.
+Desde as migrations `20260625000000`/`20260625000100`, o role `anon` só pode:
+
+- `select` direto em `programacao`/`usuarios`/`log_exportacoes` (precisa pra renderizar a tela);
+- chamar 3 funções RPC (`security definer`, validam a entrada e só tocam as colunas certas):
+  - `plantio.registrar_bloco(p_layers, p_mapeamento, p_projeto, p_usuario)` — usada pelo botão
+    "Registrar"; atualiza `mapeamento`/`projeto` dos talhões do bloco e grava o log numa só
+    transação (corrige a falta de atomicidade do PATCH-por-talhão antigo).
+  - `plantio.upsert_usuario(p_nome, p_perfis)` / `plantio.remover_usuario(p_nome)` — usadas pelo
+    painel "Gerenciar Usuários"; é o único jeito de escrever em `usuarios` (antes não existia
+    nenhum, por isso a lista de usuários nunca saía do `localStorage` de cada máquina).
+
+Não há mais `insert`/`update`/`delete` direto nas tabelas pra `anon`. Qualquer escrita fora dessas
+3 funções (ex: um PATCH manual via REST) recebe `permission denied`.
 
 ### Rodando a engine
 

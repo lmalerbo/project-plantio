@@ -1187,10 +1187,6 @@
     <!-- Seção: Admin / Gerenciar usuários -->
     <div id="modalAdminSection" style="display:none">
       <h3>Gerenciar Usuários</h3>
-      <div id="adminSyncWarning" style="display:none;color:var(--accent);font-size:11px;
-           padding:6px 8px;border:1px solid var(--accent);border-radius:4px;margin-bottom:8px">
-        ⚠ Alterações locais não aplicadas a todos — exporte e rode ATUALIZAR.bat para propagar.
-      </div>
       <div id="adminUserList" style="max-height:220px;overflow-y:auto"></div>
       <div class="admin-section">
         <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px">Novo usuário</label>
@@ -1201,13 +1197,12 @@
           <button class="btn-modal-ok" onclick="adminAddUser()" style="padding:8px 14px;white-space:nowrap">+</button>
         </div>
       </div>
-      <p class="admin-note">Para aplicar em todos os computadores: clique em "Exportar", salve o arquivo <strong>usuarios.json</strong> na pasta do projeto e rode <strong>ATUALIZAR.bat</strong>.</p>
+      <p class="admin-note">Mudanças aqui (adicionar/remover usuário, trocar perfil) são salvas direto no Supabase e já valem pra todo mundo, sem precisar exportar nada.</p>
 
       <p class="admin-note">A demanda (Sequência de Plantio + Preparo + Base de Fazendas) é atualizada
         rodando <strong>ATUALIZAR.bat</strong> na pasta do projeto — ver SETUP.md.</p>
 
       <div class="modal-actions">
-        <button class="btn-modal-cancel" onclick="adminExportJson()">💾 Salvar e exportar usuarios.json</button>
         <button class="btn-modal-ok" onclick="closeAdminSection()">← Voltar</button>
       </div>
     </div>
@@ -1847,31 +1842,24 @@ async function salvarBloco() {
 
   const mapeamento = _blocoMapeamento;
   const projeto    = document.getElementById('selProjeto').value;
-  const agora       = new Date().toISOString();
   const btn = document.getElementById('btnSubmit');
   btn.disabled = true;
 
   try {
-    await Promise.all(b.tals.map(async t => {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/programacao?layer=eq.${t.layer}`, {
-        method: 'PATCH',
-        headers: _sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
-        body: JSON.stringify({ mapeamento, projeto, updated_at: agora }),
-      });
-      if (!res.ok) throw new Error(`layer ${t.layer}: ${res.status} ${await res.text()}`);
-    }));
-
-    const logRows = b.tals.map(t => ({
-      data_consolidacao: agora, registrado_em: agora, usuario: currentUser,
-      layer: t.layer, fazenda: currentFaz, talhao: t.tal,
-      mapeamento, ciclo: t.ciclo, projeto,
-    }));
-    const logRes = await fetch(`${SUPABASE_URL}/rest/v1/log_exportacoes`, {
+    // Atualiza programacao + grava o log numa única transação no servidor (RPC
+    // security definer) — evita o estado misto que um PATCH por talhão em
+    // paralelo podia deixar se um deles falhasse no meio.
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/registrar_bloco`, {
       method: 'POST',
-      headers: _sbHeaders({ 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
-      body: JSON.stringify(logRows),
+      headers: _sbHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        p_layers: b.tals.map(t => t.layer),
+        p_mapeamento: mapeamento,
+        p_projeto: projeto,
+        p_usuario: currentUser,
+      }),
     });
-    if (!logRes.ok) throw new Error(`log_exportacoes: ${logRes.status} ${await logRes.text()}`);
+    if (!res.ok) throw new Error(`registrar_bloco: ${res.status} ${await res.text()}`);
 
     b.tals.forEach(t => {
       const td = FAZENDAS[currentFaz].talhoes[String(t.tal)];
@@ -2214,16 +2202,31 @@ document.getElementById('modalOverlay').addEventListener('click', e => {
 });
 
 // ── Admin panel ──────────────────────────────────────────────────────────
+// adminConfig é o espelho em memória de plantio.usuarios — toda mutação chama
+// upsert_usuario/remover_usuario (RPC) primeiro; só atualiza o espelho local
+// (e a tela) depois de confirmar sucesso no servidor.
+async function _chamarUpsertUsuario(nome, perfis) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/upsert_usuario`, {
+    method: 'POST',
+    headers: _sbHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ p_nome: nome, p_perfis: perfis }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+async function _chamarRemoverUsuario(nome) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/remover_usuario`, {
+    method: 'POST',
+    headers: _sbHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ p_nome: nome }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
+
 function openAdminSection() {
   document.getElementById('modalSelectSection').style.display = 'none';
   document.getElementById('modalAdminSection').style.display  = '';
   renderAdminList();
-  const htmlNomes = JSON.stringify(USUARIOS_CONFIG.map(u => u.nome.toLowerCase()).sort());
-  const localNomes = JSON.stringify(adminConfig.map(u => u.nome).sort());
-  const htmlPerfis = JSON.stringify(USUARIOS_CONFIG.map(u => ({n: u.nome.toLowerCase(), p: [...(u.perfis||[])].sort()})).sort((a,b)=>a.n.localeCompare(b.n)));
-  const localPerfis = JSON.stringify(adminConfig.map(u => ({n: u.nome, p: [...u.perfis].sort()})).sort((a,b)=>a.n.localeCompare(b.n)));
-  const diverge = htmlNomes !== localNomes || htmlPerfis !== localPerfis;
-  document.getElementById('adminSyncWarning').style.display = diverge ? '' : 'none';
 }
 function closeAdminSection() {
   document.getElementById('modalSelectSection').style.display = '';
@@ -2253,24 +2256,35 @@ function renderAdminList() {
   }).join('');
 }
 
-function adminTogglePerfil(idx, perfil, checked) {
-  if (checked && !adminConfig[idx].perfis.includes(perfil))
-    adminConfig[idx].perfis.push(perfil);
-  else if (!checked)
-    adminConfig[idx].perfis = adminConfig[idx].perfis.filter(p => p !== perfil);
-  localStorage.setItem(LS('users_config'), JSON.stringify(adminConfig));
-  if (adminConfig[idx].nome === currentUser) applyUserPermissions(currentUser);
+async function adminTogglePerfil(idx, perfil, checked) {
+  const u = adminConfig[idx];
+  const perfis = checked
+    ? [...new Set([...u.perfis, perfil])]
+    : u.perfis.filter(p => p !== perfil);
+  if (!perfis.length) { showToast('Usuário precisa de ao menos um perfil.'); renderAdminList(); return; }
+  try {
+    await _chamarUpsertUsuario(u.nome, perfis);
+    u.perfis = perfis;
+    if (u.nome === currentUser) applyUserPermissions(currentUser);
+  } catch (e) {
+    showToast(`Erro ao salvar usuário: ${e.message}`);
+    renderAdminList();   // desfaz o toggle visual — a mudança não foi confirmada no servidor
+  }
 }
 
-function adminRemoveUser(idx) {
+async function adminRemoveUser(idx) {
   const nome = adminConfig[idx].nome;
   if (!confirm(`Remover usuário "${nome}"?`)) return;
-  adminConfig.splice(idx, 1);
-  localStorage.setItem(LS('users_config'), JSON.stringify(adminConfig));
-  renderAdminList();
+  try {
+    await _chamarRemoverUsuario(nome);
+    adminConfig.splice(idx, 1);
+    renderAdminList();
+  } catch (e) {
+    showToast(`Erro ao remover usuário: ${e.message}`);
+  }
 }
 
-function adminAddUser() {
+async function adminAddUser() {
   const nome = document.getElementById('inputAdminUser').value.trim().toLowerCase();
   if (!nome) return;
   if (adminConfig.find(u => u.nome === nome)) {
@@ -2280,23 +2294,16 @@ function adminAddUser() {
   if (document.getElementById('chkPreenchimento').checked) perfis.push('preenchimento');
   if (document.getElementById('chkDashboard').checked)     perfis.push('dashboard');
   if (!perfis.length) { alert('Selecione pelo menos um perfil.'); return; }
-  adminConfig.push({ nome, perfis });
-  localStorage.setItem(LS('users_config'), JSON.stringify(adminConfig));
-  document.getElementById('inputAdminUser').value = '';
-  renderAdminList();
+  try {
+    await _chamarUpsertUsuario(nome, perfis);
+    adminConfig.push({ nome, perfis });
+    document.getElementById('inputAdminUser').value = '';
+    renderAdminList();
+  } catch (e) {
+    showToast(`Erro ao adicionar usuário: ${e.message}`);
+  }
 }
 document.getElementById('inputAdminUser').onkeydown = e => { if (e.key === 'Enter') adminAddUser(); };
-
-function adminExportJson() {
-  const blob = new Blob([JSON.stringify(adminConfig, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'usuarios.json';
-  a.click();
-  URL.revokeObjectURL(a.href);
-  document.getElementById('adminSyncWarning').style.display = 'none';
-  showToast('usuarios.json baixado — coloque na pasta do projeto e rode ATUALIZAR.bat');
-}
 
 function updateUserBadge() {
   document.getElementById('userBadge').textContent = currentUser || 'Selecionar usuário';
