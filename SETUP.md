@@ -153,3 +153,15 @@ Não há mais `insert`/`update`/`delete` direto nas tabelas pra `anon`. Qualquer
 5. Duplo clique em **`SINCRONIZAR_PLANILHA.bat`** sempre que quiser refletir os registros feitos no
    formulário de volta na planilha de Sequência (colunas Sist. Conser./Mapeamento/Projeto-Mapa) — **feche a
    planilha no Excel antes de rodar**, senão a sincronização falha (arquivo em uso).
+
+## 6. Backlog — melhorias futuras
+
+- **Autenticação real no formulário.** Hoje "selecionar usuário" é só escolher um nome numa lista —
+  sem senha, sem verificação de identidade; o `p_usuario` enviado pras RPCs (`registrar_bloco` etc.)
+  é só um texto que o navegador informa, sem garantia de que é mesmo aquela pessoa. Trocar por login
+  de verdade via **Supabase Auth** (email/senha ou magic link) daria identidade confiável por sessão,
+  abriria a porta pra RLS por usuário autenticado (em vez de só "anon pode chamar a RPC") e tornaria
+  o log de exportações inviolável. Trade-off: precisa criar conta de cada analista, tela de login e
+  gerenciamento de sessão — desproporcional pro tamanho da equipe hoje, por isso ficou pra depois.
+- Origin check no Cloudflare Worker (`/upload` aceita chamada de qualquer lugar que souber a URL).
+- Ajuste de fuso (UTC vs. horário local) no cálculo de "entregue no prazo" do dashboard.
