@@ -159,9 +159,13 @@
 <script>
 const GH_OWNER = 'lmalerbo';
 const GH_REPO  = 'project-plantio';
-const API_URL  = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/releases?per_page=100`;
+const API_URL  = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/releases`;
 
 let allReleases = [];
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 
 function fileIcon(name) {
   const ext = name.split('.').pop().toLowerCase();
@@ -200,19 +204,19 @@ function renderReleases(releases) {
         <div class="asset-left">
           <span class="asset-icon">${fileIcon(a.name)}</span>
           <div>
-            <div class="asset-name">${a.name}</div>
+            <div class="asset-name">${escapeHtml(a.name)}</div>
             <div class="asset-size">${fileLabel(a.name)} · ${fmtBytes(a.size)}</div>
           </div>
         </div>
-        <a class="btn-download" href="${a.browser_download_url}" download>Baixar</a>
+        <a class="btn-download" href="${escapeHtml(a.browser_download_url)}" download>Baixar</a>
       </div>`).join('') : `<div style="color:var(--muted);font-size:13px">Nenhum arquivo nesta fazenda.</div>`;
 
     return `
-    <div class="release-card open" data-name="${rel.name || rel.tag_name}">
+    <div class="release-card open" data-name="${escapeHtml(rel.name || rel.tag_name)}">
       <div class="release-header" onclick="toggleCard(this.parentElement)">
         <div class="release-title">
-          ${rel.name || rel.tag_name}
-          <span class="release-cod">${rel.tag_name}</span>
+          ${escapeHtml(rel.name || rel.tag_name)}
+          <span class="release-cod">${escapeHtml(rel.tag_name)}</span>
         </div>
         <div style="display:flex;gap:14px;align-items:center">
           <span class="release-date">${fmtDate(rel.published_at || rel.created_at)}</span>
@@ -236,17 +240,35 @@ function filtrar() {
   renderReleases(filtered);
 }
 
+async function fetchAllReleases() {
+  const PAGE_SIZE = 100;
+  let page = 1;
+  let all = [];
+  while (true) {
+    const res = await fetch(`${API_URL}?per_page=${PAGE_SIZE}&page=${page}`);
+    if (!res.ok) {
+      if (res.status === 403) {
+        throw new Error('limite de requisições da API do GitHub atingido — aguarde uma hora e tente de novo');
+      }
+      throw new Error(`GitHub API: ${res.status} ${res.statusText}`);
+    }
+    const batch = await res.json();
+    all = all.concat(batch);
+    if (batch.length < PAGE_SIZE) break;
+    page++;
+  }
+  return all;
+}
+
 async function load() {
   try {
-    const res = await fetch(API_URL);
-    if (!res.ok) throw new Error(`GitHub API: ${res.status} ${res.statusText}`);
-    allReleases = await res.json();
+    allReleases = await fetchAllReleases();
     // Sort by name (fazenda name)
     allReleases.sort((a, b) => (a.name || a.tag_name).localeCompare(b.name || b.tag_name, 'pt-BR'));
     renderReleases(allReleases);
   } catch (e) {
     document.getElementById('content').innerHTML =
-      `<div class="error-msg">Erro ao carregar releases: ${e.message}</div>`;
+      `<div class="error-msg">Erro ao carregar releases: ${escapeHtml(e.message)}</div>`;
     document.getElementById('counter').textContent = 'erro';
   }
 }

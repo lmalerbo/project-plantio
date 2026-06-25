@@ -81,6 +81,7 @@ print("Lendo programação do Supabase...")
 _res = requests.get(
     f"{SUPABASE_URL}/rest/v1/programacao?select=bloco_id,sist_conser,mapeamento,projeto",
     headers=SB_HEADERS,
+    timeout=30,
 )
 if not _res.ok:
     print(f"ERRO ao ler programacao: {_res.status_code} {_res.text}")
@@ -111,6 +112,9 @@ if not _plantio_found:
     fechar_log(_log_fh)
     input("\nPressione Enter para sair...")
     sys.exit(1)
+if len(_plantio_found) > 1:
+    print(f"  AVISO: {len(_plantio_found)} arquivos em base_plantio/ — usando o primeiro encontrado "
+          f"({_plantio_found[0]}); remova os demais pra evitar ambiguidade.")
 SOURCE_PLANTIO = os.path.abspath(_plantio_found[0])
 print(f"  Planilha de plantio: {SOURCE_PLANTIO}")
 

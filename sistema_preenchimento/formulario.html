@@ -576,29 +576,6 @@
     font-family: monospace;
   }
 
-  /* ── Banner pendente ── */
-  .banner-pendente {
-    background: rgba(200,150,12,.1);
-    border: 1px solid var(--accent);
-    border-radius: 10px;
-    padding: 12px 16px;
-    display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    font-size: 13px;
-  }
-  .banner-pendente strong { color: var(--accent); }
-  .banner-actions { display: flex; gap: 8px; flex-shrink: 0; }
-  .btn-banner-export {
-    background: var(--accent); color: #fff;
-    border: none; border-radius: 6px; padding: 6px 14px;
-    font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit;
-  }
-  .btn-banner-export:hover { background: var(--accent2); }
-  .btn-banner-discard {
-    background: none; border: 1px solid var(--border);
-    color: var(--muted); border-radius: 6px; padding: 6px 12px;
-    font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit;
-  }
-  .btn-banner-discard:hover { border-color: var(--red); color: var(--red); }
 
   .btn-clear {
     background: none; border: 1px solid var(--border);
@@ -1246,8 +1223,20 @@
 // dados de outro app). Toda chave de local/sessionStorage deste arquivo usa LS().
 function LS(key) { return 'plantio_' + key; }
 
-// ── Servidor de consolidação ──────────────────────────────────────────────
-const SERVIDOR_URL = 'http://10.120.107.81:5678';
+// Nome de fazenda/usuário vem da planilha ou de texto livre digitado por um
+// administrador — nunca confiável. Tudo que é colocado em innerHTML como texto
+// visível passa por aqui antes (evita XSS armazenado via nome malicioso).
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// Para nome usado dentro de um literal JS de string simples embutido num atributo
+// inline (ex: onclick="fn('${...}')") — escapa pra contexto JS primeiro, depois
+// pra contexto de atributo HTML (a ordem importa: o navegador desfaz o HTML antes
+// de interpretar o JS do atributo).
+function escAttrJs(s) {
+  return escapeHtml(String(s ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
+}
 
 // ── Data ──────────────────────────────────────────────────────────────────
 const USUARIOS_HA = {};
@@ -1307,7 +1296,7 @@ async function carregarDadosSupabase() {
       _sbFetchAll(`${SUPABASE_URL}/rest/v1/log_exportacoes?select=usuario,layer,data_consolidacao,projeto&order=data_consolidacao.asc`),
       _sbFetchAll(`${SUPABASE_URL}/rest/v1/usuarios?select=*`),
     ]);
-    if (!programacao.length) return;
+    if (!programacao.length) return false;
 
     for (const k of Object.keys(FAZENDAS)) delete FAZENDAS[k];
     const layerHa = {};
@@ -1359,9 +1348,19 @@ async function carregarDadosSupabase() {
       usuarios.forEach(u => USUARIOS_CONFIG.push({ nome: u.nome, perfis: u.perfis || [] }));
       adminConfig = USUARIOS_CONFIG.map(u => ({ nome: u.nome.toLowerCase(), perfis: u.perfis || ['preenchimento','dashboard'] }));
     }
+    return true;
   } catch (e) {
-    console.error('Falha ao carregar dados do Supabase — usando dados locais embutidos:', e);
+    console.error('Falha ao carregar dados do Supabase:', e);
+    return false;
   }
+}
+
+function mostrarErroCarregamento() {
+  const banner = document.createElement('div');
+  banner.style.cssText = 'position:fixed;top:60px;left:0;right:0;z-index:998;background:var(--red);' +
+    'color:#fff;text-align:center;padding:10px 16px;font-size:13px;font-weight:600;font-family:inherit';
+  banner.textContent = '⚠ Não foi possível carregar os dados do Supabase. Verifique sua conexão e recarregue a página.';
+  document.body.appendChild(banner);
 }
 
 // ── Import agora é feito pela engine Python (sistema_preenchimento/engine/atualizar_programacao.py) ──
@@ -1390,8 +1389,9 @@ window.onload = async () => {
   loading.textContent = 'Carregando dados...';
   document.body.appendChild(loading);
 
-  await carregarDadosSupabase();
+  const carregouOk = await carregarDadosSupabase();
   loading.remove();
+  if (!carregouOk) mostrarErroCarregamento();
 
   populateMesFilter();
   document.getElementById('sidebarTitle').textContent = `Fazendas (${FAZENDA_NAMES.length})`;
@@ -1518,13 +1518,13 @@ function renderFazendas(names) {
         const nMes = Object.values(d.talhoes).filter(t => isSelMonth(t)).length;
         const { status, cls, ciclo } = getFazStatus(name);
         return `<div class="fazenda-item${done ? ' registered' : ''}${name === currentFaz ? ' active' : ''}${nMes > 0 ? ' has-mes-atual' : ''}"
-                     data-name="${name.replace(/"/g,'&quot;')}"
-                     onmousedown="selectFazenda('${name.replace(/'/g,"\\'")}')">
+                     data-name="${escapeHtml(name)}"
+                     onmousedown="selectFazenda('${escAttrJs(name)}')">
           <div style="flex:1;min-width:0">
-            <div class="fazenda-name">${name}${done ? ' <span class="reg-dot">&#10003;</span>' : ''}</div>
+            <div class="fazenda-name">${escapeHtml(name)}${done ? ' <span class="reg-dot">&#10003;</span>' : ''}</div>
             <div class="fazenda-meta" style="display:flex;gap:4px;margin-top:3px;flex-wrap:wrap">
-              <span class="faz-tag faz-tag-${cls}">${status}</span>
-              <span class="faz-tag faz-tag-muted">${ciclo}</span>
+              <span class="faz-tag faz-tag-${cls}">${escapeHtml(status)}</span>
+              <span class="faz-tag faz-tag-muted">${escapeHtml(ciclo)}</span>
               ${nMes > 0 ? `<span style="font-size:9px;color:var(--green);font-weight:700">● mês</span>` : ''}
             </div>
           </div>
@@ -1719,14 +1719,14 @@ function renderBlocos() {
     const talsTxt = b.tals.map(t => t.tal).sort((a, c) => a - c).join(', ');
     return `<div class="fazenda-item${b.blocoId === currentBlocoId ? ' active' : ''}"
                  style="background:var(--bg);border:1px solid var(--border);border-radius:8px"
-                 onclick="selectBloco('${b.blocoId.replace(/'/g, "\\'")}')">
+                 onclick="selectBloco('${escAttrJs(b.blocoId)}')">
       <div style="flex:1;min-width:0">
         <div class="fazenda-name">${fmtMesPlantio(b.mesPlantio)}
           <span style="font-weight:400;color:var(--muted);font-size:12px">talhões ${talsTxt}</span></div>
         <div class="fazenda-meta" style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">
-          <span class="faz-tag faz-tag-${scCls}">${b.sistConser || 'Sem dado'}</span>
-          <span class="faz-tag faz-tag-muted">MAP: ${b.mapeamento.toUpperCase()}</span>
-          <span class="faz-tag faz-tag-${cls}">${b.projeto.toUpperCase()}</span>
+          <span class="faz-tag faz-tag-${scCls}">${escapeHtml(b.sistConser || 'Sem dado')}</span>
+          <span class="faz-tag faz-tag-muted">MAP: ${escapeHtml(b.mapeamento.toUpperCase())}</span>
+          <span class="faz-tag faz-tag-${cls}">${escapeHtml(b.projeto.toUpperCase())}</span>
         </div>
       </div>
       <div class="fazenda-count">${b.ha.toFixed(1)} ha</div>
@@ -1912,13 +1912,13 @@ function renderLog() {
   sec.classList.add('visible');
 
   const rows = [...records].reverse().map(r => `<tr>
-      <td>${r.timestamp}</td>
-      <td>${r.usuario}</td>
-      <td><strong>${r.fazenda}</strong></td>
-      <td style="font-family:monospace">${r.talhoes}</td>
+      <td>${escapeHtml(r.timestamp)}</td>
+      <td>${escapeHtml(r.usuario)}</td>
+      <td><strong>${escapeHtml(r.fazenda)}</strong></td>
+      <td style="font-family:monospace">${escapeHtml(r.talhoes)}</td>
       <td style="font-family:monospace">${(r.ha||0).toFixed(1)} ha</td>
-      <td>${r.mapeamento}</td>
-      <td><span class="status-pill status-${projetoCls(r.projeto)}">${r.projeto}</span></td>
+      <td>${escapeHtml(r.mapeamento)}</td>
+      <td><span class="status-pill status-${projetoCls(r.projeto)}">${escapeHtml(r.projeto)}</span></td>
     </tr>`).join('');
 
   content.innerHTML = `<table>
@@ -2178,8 +2178,8 @@ function renderUserChips() {
     const perfis = getUserPerfis(u);
     const badges = (perfis.includes('preenchimento') ? '<span class="perfil-badge p">P</span>' : '') +
                    (perfis.includes('dashboard')     ? '<span class="perfil-badge d">D</span>' : '');
-    return `<div class="user-chip${u === currentUser ? ' active' : ''}" data-nome="${u}">
-      <span>${u}${badges}</span>
+    return `<div class="user-chip${u === currentUser ? ' active' : ''}" data-nome="${escapeHtml(u)}">
+      <span>${escapeHtml(u)}${badges}</span>
     </div>`;
   }).join('');
   container.querySelectorAll('.user-chip[data-nome]').forEach(chip => {
@@ -2241,7 +2241,7 @@ function renderAdminList() {
     const hasP = u.perfis.includes('preenchimento');
     const hasD = u.perfis.includes('dashboard');
     return `<div class="admin-user-row">
-      <span class="admin-user-name">${u.nome}</span>
+      <span class="admin-user-name">${escapeHtml(u.nome)}</span>
       <label class="admin-perfil-check">
         <input type="checkbox" ${hasP ? 'checked' : ''} onchange="adminTogglePerfil(${idx},'preenchimento',this.checked)"> Preencher
       </label>
@@ -2395,15 +2395,15 @@ function renderPlano() {
     const isDone     = isDoneRec || isDoneMark;
     const { status, cls, ciclo } = getFazStatus(name);
     const nTal = Object.keys(FAZENDAS[name]?.talhoes || {}).length;
-    const esc = name.replace(/'/g, "\\'");
+    const esc = escAttrJs(name);
     const checkIcon = isDoneRec ? '&#9745;' : isDoneMark ? '&#9733;' : '&#9744;';
     return `<div class="plan-item${isDone ? ' done' : ''}" onclick="goToFazenda('${esc}')" oncontextmenu="openPlanCtxMenu(event,'${esc}')">
       <span class="plan-check" title="${isDoneMark && !isDoneRec ? 'Marcada manualmente' : ''}">${checkIcon}</span>
       <div class="plan-item-info">
-        <div class="plan-item-name">${name}</div>
+        <div class="plan-item-name">${escapeHtml(name)}</div>
         <div class="plan-item-meta">
-          <span class="faz-tag faz-tag-${cls}">${status}</span>
-          <span class="faz-tag faz-tag-muted">${ciclo}</span>
+          <span class="faz-tag faz-tag-${cls}">${escapeHtml(status)}</span>
+          <span class="faz-tag faz-tag-muted">${escapeHtml(ciclo)}</span>
           <span style="color:var(--muted)">${nTal} tal.</span>
         </div>
       </div>
@@ -2477,9 +2477,9 @@ function renderPlanDropdown(q) {
   dd.innerHTML = matches.map(n => {
     const inPlan = planFazendas.includes(n);
     const { status, cls } = getFazStatus(n);
-    return `<div class="plan-dropdown-item${inPlan ? ' already' : ''}" onmousedown="addToPlano('${n.replace(/'/g,"\\'")}')">
-      <span style="font-weight:600">${n}</span>
-      <span class="faz-tag faz-tag-${cls}" style="float:right">${status}</span>
+    return `<div class="plan-dropdown-item${inPlan ? ' already' : ''}" onmousedown="addToPlano('${escAttrJs(n)}')">
+      <span style="font-weight:600">${escapeHtml(n)}</span>
+      <span class="faz-tag faz-tag-${cls}" style="float:right">${escapeHtml(status)}</span>
     </div>`;
   }).join('') + (extra > 0 ? `<div style="padding:6px 10px;font-size:11px;color:var(--muted)">+ ${extra} outros resultados</div>` : '');
   dd.classList.add('open');
@@ -2518,7 +2518,7 @@ function populateConsultaFilters() {
   const selSc = document.getElementById('cFiltroSistConser');
   const curSc = selSc.value;
   selSc.innerHTML = '<option value="">— todos os Sist. Conser. —</option>' +
-    [...sistConsers].sort().map(sc => `<option value="${sc}">${sc === 'SEM_DADO' ? 'Sem dado' : sc}</option>`).join('');
+    [...sistConsers].sort().map(sc => `<option value="${escapeHtml(sc)}">${escapeHtml(sc === 'SEM_DADO' ? 'Sem dado' : sc)}</option>`).join('');
   selSc.value = curSc;
 }
 
@@ -2627,16 +2627,16 @@ function renderConsulta(page) {
     const conc  = tals.filter(isTalDone).length;
     const { status, cls, ciclo } = getFazStatus(name);
     const haTotal = tals.reduce((s, t) => s + (t.ha || 0), 0);
-    const escName = name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const escName = escAttrJs(name);
     const cbTd = _consultaSelectMode
       ? `<td class="consulta-cb" onclick="event.stopPropagation()"><input type="checkbox" ${_consultaSelected.has(name) ? 'checked' : ''} onclick="toggleConsultaSel('${escName}',this)"></td>`
       : '';
     return `<tr class="consulta-faz-row${_consultaSelected.has(name) ? ' selected' : ''}" onclick="toggleFazDetail('${escName}',this,'${filtMes}','${filtSc}')" oncontextmenu="openCtxMenu(event,'${escName}')" id="cfr-${CSS.escape(name)}">
       ${cbTd}
-      <td><span class="consulta-expand-icon" id="cfi-${CSS.escape(name)}">▶</span><strong>${name}</strong></td>
+      <td><span class="consulta-expand-icon" id="cfi-${CSS.escape(name)}">▶</span><strong>${escapeHtml(name)}</strong></td>
       <td style="font-family:monospace">${d.cod}</td>
-      <td><span class="faz-tag faz-tag-muted">${ciclo}</span></td>
-      <td><span class="faz-tag faz-tag-${cls}">${status}</span></td>
+      <td><span class="faz-tag faz-tag-muted">${escapeHtml(ciclo)}</span></td>
+      <td><span class="faz-tag faz-tag-${cls}">${escapeHtml(status)}</span></td>
       <td style="font-family:monospace">${conc}/${totalTals}</td>
       <td style="font-family:monospace">${haTotal.toFixed(1)} ha</td>
     </tr>
@@ -2702,10 +2702,10 @@ function toggleFazDetail(name, rowEl, filtMesArg, filtScArg) {
     const data  = _ym ? _ym.split('-').reverse().join('/') : '—';
     return `<tr>
       <td style="font-family:monospace;font-weight:700">${t}</td>
-      <td><span class="faz-tag faz-tag-${scCls}" style="font-size:10px">${td.sistConser || 'Sem dado'}</span></td>
-      <td><span class="faz-tag faz-tag-${stCls}" style="font-size:10px">${td.projeto}</span></td>
+      <td><span class="faz-tag faz-tag-${scCls}" style="font-size:10px">${escapeHtml(td.sistConser || 'Sem dado')}</span></td>
+      <td><span class="faz-tag faz-tag-${stCls}" style="font-size:10px">${escapeHtml(td.projeto)}</span></td>
       <td style="font-family:monospace">${(td.ha || 0).toFixed(1)} ha</td>
-      <td>${mapeamentoEfetivo(td.sistConser, td.mapeamento)}</td>
+      <td>${escapeHtml(mapeamentoEfetivo(td.sistConser, td.mapeamento))}</td>
       <td style="font-family:monospace">${data}</td>
     </tr>`;
   }).join('');

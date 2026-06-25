@@ -76,9 +76,11 @@ SB_HEADERS = {
 
 os.chdir(_BASE_DIR)
 
+HTTP_TIMEOUT = 30   # segundos — evita que o script fique pendurado indefinidamente numa rede instável
+
 # ── 1. Ler valores existentes no Supabase (preservar preenchimento) ──────
 print("Lendo programação existente no Supabase...")
-_res = requests.get(f"{SUPABASE_URL}/rest/v1/programacao?select=layer,mapeamento,projeto", headers=SB_HEADERS)
+_res = requests.get(f"{SUPABASE_URL}/rest/v1/programacao?select=layer,mapeamento,projeto", headers=SB_HEADERS, timeout=HTTP_TIMEOUT)
 if not _res.ok:
     print(f"ERRO ao ler programacao: {_res.status_code} {_res.text}")
     fechar_log(_log_fh)
@@ -98,6 +100,9 @@ layer_ha = {}   # (cod_faz, talhao) → area_ha
 if not _base_faz_files:
     print("  AVISO: Nenhum arquivo em base_fazendas/ — área de cada talhão ficará 0.\n")
 else:
+    if len(_base_faz_files) > 1:
+        print(f"  AVISO: {len(_base_faz_files)} arquivos em base_fazendas/ — usando o primeiro encontrado "
+              f"({_base_faz_files[0]}); remova os demais pra evitar ambiguidade.")
     SOURCE_BASE = _base_faz_files[0]
     print(f"  Base fazendas: {SOURCE_BASE}")
     df_base = pd.read_excel(SOURCE_BASE, engine='openpyxl')
@@ -175,6 +180,9 @@ if not _plantio_found:
     fechar_log(_log_fh)
     input("\nPressione Enter para sair...")
     sys.exit(1)
+if len(_plantio_found) > 1:
+    print(f"  AVISO: {len(_plantio_found)} arquivos em base_plantio/ — usando o primeiro encontrado "
+          f"({_plantio_found[0]}); remova os demais pra evitar ambiguidade.")
 SOURCE_PLANTIO = _plantio_found[0]
 print(f"  Planilha de plantio: {SOURCE_PLANTIO}")
 
@@ -337,7 +345,11 @@ HEADERS_UPSERT = dict(SB_HEADERS, Prefer='resolution=merge-duplicates,return=min
 BATCH = 500
 for i in range(0, len(prog_rows), BATCH):
     chunk = prog_rows[i:i+BATCH]
-    res = requests.post(f"{SUPABASE_URL}/rest/v1/programacao", headers=HEADERS_UPSERT, json=chunk)
+    try:
+        res = requests.post(f"{SUPABASE_URL}/rest/v1/programacao", headers=HEADERS_UPSERT, json=chunk, timeout=HTTP_TIMEOUT)
+    except requests.RequestException as e:
+        print(f"  ⚠  Falha de rede no lote {i}-{i+len(chunk)} ({e}) — tentando novamente uma vez...")
+        res = requests.post(f"{SUPABASE_URL}/rest/v1/programacao", headers=HEADERS_UPSERT, json=chunk, timeout=HTTP_TIMEOUT)
     if not res.ok:
         print(f"ERRO ao enviar lote {i}-{i+len(chunk)}: {res.status_code} {res.text}")
         fechar_log(_log_fh)
