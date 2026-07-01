@@ -899,6 +899,7 @@
     <button class="nav-tab active" id="tabDash" onclick="setView('dashboard')">Dashboards</button>
     <button class="nav-tab" id="tabWork" onclick="setView('preenchimento')">Registros</button>
     <button class="nav-tab" id="tabConsulta" onclick="setView('consulta')">Consultas</button>
+    <button class="nav-tab" id="tabAdmin" onclick="setView('admin')" style="display:none">Admin</button>
   </nav>
   <div class="header-right">
     <div class="theme-toggle" onclick="toggleTheme()" id="themeToggle" title="Alternar tema">&#9790;</div>
@@ -1143,6 +1144,80 @@
   <div id="consultaResults"></div>
 </div>
 
+<!-- ══ Tela 4: Admin ══════════════════════════════════════════════════════ -->
+<div id="viewAdmin" class="dash-page" style="display:none">
+
+  <!-- Usuários -->
+  <div class="form-card">
+    <div class="form-card-header">
+      <div class="form-card-title">Usuários</div>
+    </div>
+    <div class="form-card-body">
+      <div id="adminUserList" style="max-height:260px;overflow-y:auto"></div>
+      <div class="admin-section">
+        <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px">Novo usuário</label>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap">
+          <input type="text" id="inputAdminUser" placeholder="Nome" style="flex:1;min-width:140px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;color:var(--text);font-family:inherit;font-size:13px">
+          <label class="admin-perfil-check"><input type="checkbox" id="chkPreenchimento" checked> Preencher</label>
+          <label class="admin-perfil-check"><input type="checkbox" id="chkDashboard" checked> Dashboard</label>
+          <label class="admin-perfil-check"><input type="checkbox" id="chkAdmin"> Admin</label>
+          <button class="btn-modal-ok" onclick="adminAddUser()" style="padding:8px 14px;white-space:nowrap">+</button>
+        </div>
+      </div>
+      <p class="admin-note">Mudanças aqui (adicionar/remover usuário, trocar perfil) são salvas direto no Supabase e já valem pra todo mundo.</p>
+    </div>
+  </div>
+
+  <!-- Atualizar Demanda -->
+  <div class="form-card">
+    <div class="form-card-header">
+      <div class="form-card-title">Atualizar Demanda</div>
+    </div>
+    <div class="form-card-body">
+      <p class="admin-note" style="margin-bottom:14px">Seleciona a Sequência de Plantio e o(s) arquivo(s) de Preparo
+        (Base de Fazendas é opcional — sem ela, a área de talhões novos fica 0). Substitui o antigo ATUALIZAR.bat.</p>
+      <div style="display:flex;flex-direction:column;gap:10px;max-width:480px">
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:4px">Sequência de Plantio</label>
+          <input type="file" id="inputSeqPlantio" accept=".xlsx" onchange="atualizarBotaoDemanda()">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:4px">Preparo (pode selecionar mais de um arquivo)</label>
+          <input type="file" id="inputPreparo" accept=".xlsx" multiple onchange="atualizarBotaoDemanda()">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:4px">Base de Fazendas (opcional)</label>
+          <input type="file" id="inputBaseFazendas" accept=".xlsx,.xls">
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <button class="btn-submit" id="btnAtualizarDemanda" onclick="enviarAtualizacaoDemanda()" disabled>Atualizar →</button>
+      </div>
+      <div id="demandaLog" style="margin-top:12px;font-size:12px;line-height:1.8"></div>
+    </div>
+  </div>
+
+  <!-- Sincronizar Planilha -->
+  <div class="form-card">
+    <div class="form-card-header">
+      <div class="form-card-title">Sincronizar Planilha <span class="frente-tag">Chrome/Edge</span></div>
+    </div>
+    <div class="form-card-body">
+      <p class="admin-note" style="margin-bottom:14px">Ajuda a colocar o sincronizador (escreve Sist. Conser./Mapeamento/Projeto
+        de volta na planilha, usando o Excel de verdade) direto na pasta de rede onde a Sequência de Plantio mora.
+        Funciona só em Chrome/Edge. Depois de instalado, é só dar duplo clique no <strong>SINCRONIZAR_PLANILHA.bat</strong>
+        na pasta sempre que quiser atualizar o status na planilha — essa parte continua manual.</p>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px" id="pastaPlanilhaStatus">Nenhuma pasta configurada.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-modal-cancel" onclick="escolherPastaPlanilha()">📁 Escolher pasta da planilha</button>
+        <button class="btn-modal-ok" id="btnInstalarSync" onclick="instalarArquivosSync()" disabled>Instalar/atualizar arquivos</button>
+      </div>
+      <div id="syncLog" style="margin-top:12px;font-size:12px;line-height:1.8"></div>
+    </div>
+  </div>
+
+</div>
+
 <!-- Context Menu -->
 <div id="ctxMenu" class="ctx-menu">
   <div class="ctx-menu-item" id="ctxAddPlanItem" onclick="ctxAddToPlan()"></div>
@@ -1172,39 +1247,13 @@
 <!-- Modal Usuários -->
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
-    <!-- Seção: Selecionar usuário -->
-    <div id="modalSelectSection">
-      <h3>Usuários</h3>
-      <div class="modal-field">
-        <label>Selecione o usuário ativo</label>
-        <div class="user-chips" id="userChips"></div>
-      </div>
-      <div class="modal-actions">
-        <button class="btn-modal-cancel" onclick="openAdminSection()">⚙ Gerenciar</button>
-        <button class="btn-modal-ok" onclick="closeUserModal()">Fechar</button>
-      </div>
+    <h3>Usuários</h3>
+    <div class="modal-field">
+      <label>Selecione o usuário ativo</label>
+      <div class="user-chips" id="userChips"></div>
     </div>
-    <!-- Seção: Admin / Gerenciar usuários -->
-    <div id="modalAdminSection" style="display:none">
-      <h3>Gerenciar Usuários</h3>
-      <div id="adminUserList" style="max-height:220px;overflow-y:auto"></div>
-      <div class="admin-section">
-        <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px">Novo usuário</label>
-        <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
-          <input type="text" id="inputAdminUser" placeholder="Nome" style="flex:1">
-          <label class="admin-perfil-check"><input type="checkbox" id="chkPreenchimento" checked> Preencher</label>
-          <label class="admin-perfil-check"><input type="checkbox" id="chkDashboard" checked> Dashboard</label>
-          <button class="btn-modal-ok" onclick="adminAddUser()" style="padding:8px 14px;white-space:nowrap">+</button>
-        </div>
-      </div>
-      <p class="admin-note">Mudanças aqui (adicionar/remover usuário, trocar perfil) são salvas direto no Supabase e já valem pra todo mundo, sem precisar exportar nada.</p>
-
-      <p class="admin-note">A demanda (Sequência de Plantio + Preparo + Base de Fazendas) é atualizada
-        rodando <strong>ATUALIZAR.bat</strong> na pasta do projeto — ver SETUP.md.</p>
-
-      <div class="modal-actions">
-        <button class="btn-modal-ok" onclick="closeAdminSection()">← Voltar</button>
-      </div>
+    <div class="modal-actions">
+      <button class="btn-modal-ok" onclick="closeUserModal()">Fechar</button>
     </div>
   </div>
 </div>
@@ -1357,8 +1406,6 @@ function mostrarErroCarregamento() {
   banner.textContent = '⚠ Não foi possível carregar os dados do Supabase. Verifique sua conexão e recarregue a página.';
   document.body.appendChild(banner);
 }
-
-// ── Import agora é feito pela engine Python (sistema_preenchimento/engine/atualizar_programacao.py) ──
 
 // ── State ─────────────────────────────────────────────────────────────────
 // Cada alteração de Mapeamento/Projeto é salva direto no Supabase (sem lote local
@@ -2117,6 +2164,418 @@ async function enviarArquivosProjeto() {
 }
 
 
+// ── Atualizar Demanda (substitui ATUALIZAR.bat) ────────────────────────────
+// Lê as planilhas direto no navegador (SheetJS, já carregada) e manda os
+// registros prontos pro Worker (/importar-demanda), que escreve no Supabase
+// com a service_role key. Porta fiel de engine/utils.py +
+// engine/atualizar_programacao.py — mantenha em sincronia manualmente.
+const CODFAZ_EXCLUIR_PREFIXO = '20';
+
+function normHeaderXlsx(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toUpperCase();
+}
+
+async function lerWorkbookXlsx(file) {
+  const buf = await file.arrayBuffer();
+  return XLSX.read(buf, { type: 'array', cellDates: true });
+}
+
+// Mirror de achar_header() em engine/utils.py.
+function acharHeaderXlsx(sheet, obrigatorios, maxRow = 15, maxCol = null) {
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: true });
+  const limite = Math.min(rows.length, maxRow);
+  for (let i = 0; i < limite; i++) {
+    let row = rows[i] || [];
+    if (maxCol != null) row = row.slice(0, maxCol);
+    const norms = row.map(c => normHeaderXlsx(c));
+    if (obrigatorios.every(h => norms.includes(h))) {
+      const hmap = {};
+      norms.forEach((h, j) => { if (h && !(h in hmap)) hmap[h] = j; });
+      return { headerRowIdx: i, hmap };
+    }
+  }
+  return { headerRowIdx: -1, hmap: {} };
+}
+
+// Mirror de parse_talhoes() em engine/utils.py.
+function parseTalhoesXlsx(raw) {
+  if (raw === null || raw === undefined) return [];
+  if (typeof raw === 'boolean') return [];
+  if (typeof raw === 'number') {
+    if (Number.isInteger(raw)) return [raw];
+    const s = String(Math.round(raw * 10000) / 10000);
+    if (!s.includes('.')) return [Math.trunc(raw)];
+    const [intpart, fracRaw] = s.split('.');
+    const frac = fracRaw.replace(/0+$/, '');
+    if (!frac) return [Math.trunc(raw)];
+    const a = parseInt(intpart, 10), b = parseInt(frac, 10);
+    return (Number.isNaN(a) || Number.isNaN(b)) ? [Math.trunc(raw)] : [a, b];
+  }
+  const s = String(raw).trim();
+  if (!s) return [];
+  const out = [];
+  for (let tok of s.split(/[,;]/)) {
+    tok = tok.trim();
+    if (!tok) continue;
+    const m = tok.match(/^(\d+)\s*a[oà]\s*(\d+)$/i);
+    if (m) {
+      const a = parseInt(m[1], 10), b = parseInt(m[2], 10);
+      for (let k = Math.min(a, b); k <= Math.max(a, b); k++) out.push(k);
+      continue;
+    }
+    const digits = tok.match(/\d+/);
+    if (digits) out.push(parseInt(digits[0], 10));
+  }
+  return out;
+}
+
+// Mirror de data_para_iso() em engine/utils.py — usa partes locais (não UTC)
+// pra não arriscar deslocar o dia por fuso horário.
+function dataParaIsoXlsx(v) {
+  if (v instanceof Date && !isNaN(v)) {
+    const y = v.getFullYear(), m = String(v.getMonth() + 1).padStart(2, '0'), d = String(v.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  return null;
+}
+
+function atualizarBotaoDemanda() {
+  const seq  = document.getElementById('inputSeqPlantio').files[0];
+  const prep = document.getElementById('inputPreparo').files;
+  document.getElementById('btnAtualizarDemanda').disabled = !(seq && prep && prep.length);
+}
+
+function _logDemanda(msg) {
+  const el = document.getElementById('demandaLog');
+  if (el) el.insertAdjacentHTML('beforeend', `<div>${msg}</div>`);
+}
+
+// Lê as 3 planilhas e devolve os registros já explodidos/juntados por talhão,
+// prontos pra mandar pro Worker (que calcula Mapeamento/Projeto com o estado
+// atual do banco e faz o upsert).
+async function processarArquivosDemanda(fileSeq, filesPrep, fileBase) {
+  const avisos = [];
+
+  // ── Base de Fazendas (área) — leitura "tipo pandas": cabeçalho é a linha 1. ──
+  const areaPorLayer = new Map();
+  if (fileBase) {
+    const wb = await lerWorkbookXlsx(fileBase);
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: null, raw: true });
+    if (rows.length) {
+      const colsNorm = {};
+      Object.keys(rows[0]).forEach(k => { colsNorm[normHeaderXlsx(k)] = k; });
+      const colCod  = ['CODIGO', 'COD FAZ', 'SECAO'].map(c => colsNorm[c]).find(Boolean);
+      const colTal  = ['TALHAO', 'TALHOES'].map(c => colsNorm[c]).find(Boolean);
+      const colArea = ['AREA_PROD', 'AREA_HA', 'HA', 'AREA'].map(c => colsNorm[c]).find(Boolean);
+      if (!colCod || !colTal || !colArea) {
+        avisos.push('Base de Fazendas: colunas esperadas (COD FAZ/TALHAO/AREA) não encontradas — área ficará 0.');
+      } else {
+        for (const r of rows) {
+          const cod = Number(r[colCod]), tal = Number(r[colTal]), area = Number(r[colArea]);
+          if (Number.isFinite(cod) && Number.isFinite(tal)) {
+            areaPorLayer.set(`${Math.trunc(cod)}|${Math.trunc(tal)}`, Math.round((area || 0) * 100) / 100);
+          }
+        }
+      }
+    }
+  } else {
+    avisos.push('Nenhuma Base de Fazendas selecionada — área de cada talhão ficará 0.');
+  }
+
+  // ── Preparo (Sist. Conser. por talhão) — pode ter mais de um arquivo. ──
+  const sistConserPorLayer = new Map();
+  for (const fp of filesPrep) {
+    const wb = await lerWorkbookXlsx(fp);
+    const sheetName = wb.SheetNames.find(n => normHeaderXlsx(n) === 'CONSERVACAO');
+    if (!sheetName) { avisos.push(`Aba 'CONSERVAÇÃO' não encontrada em ${fp.name} — ignorada.`); continue; }
+    const sheet = wb.Sheets[sheetName];
+    const { headerRowIdx, hmap } = acharHeaderXlsx(sheet, ['SECAO', 'TALHAO', 'SISTEMA DE CONSERVACAO']);
+    if (headerRowIdx === -1) { avisos.push(`Cabeçalho (Seção/Talhão/Sistema de Conservação) não encontrado em ${fp.name} — ignorada.`); continue; }
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: true });
+    const idxCod = hmap['SECAO'], idxTal = hmap['TALHAO'], idxSc = hmap['SISTEMA DE CONSERVACAO'];
+    for (let i = headerRowIdx + 1; i < rows.length; i++) {
+      const row = rows[i] || [];
+      const codRaw = row[idxCod], talRaw = row[idxTal], scRaw = row[idxSc];
+      if (codRaw == null || talRaw == null) continue;
+      const cod = Number(codRaw), tal = Number(talRaw);
+      if (!Number.isFinite(cod) || !Number.isFinite(tal)) continue;
+      sistConserPorLayer.set(`${Math.trunc(cod)}|${Math.trunc(tal)}`, normalizaSistConser(scRaw));
+    }
+  }
+
+  // ── Sequência de Plantio (demanda, blocos de talhões). ──
+  const wbSeq = await lerWorkbookXlsx(fileSeq);
+  const sheetSeqName = wbSeq.SheetNames.find(n => normHeaderXlsx(n) === 'SEQUENCIA');
+  if (!sheetSeqName) throw new Error(`Aba 'Sequencia' não encontrada. Abas disponíveis: ${wbSeq.SheetNames.join(', ')}`);
+  const sheetSeq = wbSeq.Sheets[sheetSeqName];
+  const LIMITE_COL = 28; // coluna AB — colunas além dela (bloco "MUDA") são fora de escopo
+  const { headerRowIdx: hrSeq, hmap: hmapSeq } = acharHeaderXlsx(sheetSeq, ['MES DE PLANTIO', 'CODIGO', 'SECAO', 'TALHOES'], 10, LIMITE_COL);
+  if (hrSeq === -1) throw new Error("Cabeçalho (Mês de Plantio/Código/Seção/Talhões) não encontrado na aba 'Sequencia'.");
+
+  const rowsSeq = XLSX.utils.sheet_to_json(sheetSeq, { header: 1, defval: null, raw: true });
+  const idxMes = hmapSeq['MES DE PLANTIO'], idxCic = hmapSeq['CICLO'], idxCod = hmapSeq['CODIGO'],
+        idxSec = hmapSeq['SECAO'], idxTal = hmapSeq['TALHOES'], idxAmb = hmapSeq['AMBIENTE'];
+
+  const exploded = [];
+  let nLinhas = 0, nAdmin = 0, nIgnoradas = 0, nFalhaTalhao = 0;
+  for (let i = hrSeq + 1; i < rowsSeq.length; i++) {
+    const row = (rowsSeq[i] || []).slice(0, LIMITE_COL);
+    const codRaw = idxCod != null ? row[idxCod] : null;
+    const secRaw = idxSec != null ? row[idxSec] : null;
+    const talRaw = idxTal != null ? row[idxTal] : null;
+    if (codRaw == null || secRaw == null || talRaw == null) {
+      if (codRaw != null || secRaw != null || talRaw != null) nIgnoradas++;
+      continue;
+    }
+    const codFaz = Number(codRaw);
+    if (!Number.isFinite(codFaz)) { nIgnoradas++; continue; }
+    if (String(Math.trunc(codFaz)).startsWith(CODFAZ_EXCLUIR_PREFIXO)) { nAdmin++; continue; }
+
+    const talhoes = parseTalhoesXlsx(talRaw);
+    if (!talhoes.length) {
+      avisos.push(`COD FAZ ${codFaz}: não foi possível interpretar TALHÕES = ${JSON.stringify(talRaw)} — linha ignorada.`);
+      nFalhaTalhao++;
+      continue;
+    }
+    nLinhas++;
+    const fazenda = String(secRaw).trim();
+    const mesPlantio = idxMes != null ? dataParaIsoXlsx(row[idxMes]) : null;
+    const ciclo = (idxCic != null && row[idxCic] != null) ? String(row[idxCic]).trim() : '';
+    const ambiente = (idxAmb != null && row[idxAmb]) ? String(row[idxAmb]).trim() : '';
+    const blocoId = `${Math.trunc(codFaz)}|${mesPlantio}|${String(talRaw).trim()}`;
+
+    for (const talhao of talhoes) {
+      exploded.push({ cod_faz: Math.trunc(codFaz), fazenda, talhao, mes_plantio: mesPlantio, ciclo, ambiente, bloco_id: blocoId });
+    }
+  }
+
+  // ── Junta tudo por LAYER (último ganha em caso de talhão duplicado). ──
+  let semArea = 0, semSistConser = 0;
+  const porLayer = new Map();
+  for (const r of exploded) {
+    const layer = Number(`${r.cod_faz}${String(r.talhao).padStart(3, '0')}`);
+    const key = `${r.cod_faz}|${r.talhao}`;
+    const areaHa = areaPorLayer.has(key) ? areaPorLayer.get(key) : 0;
+    if (!areaHa) semArea++;
+    const temSc = sistConserPorLayer.has(key);
+    const sistConser = temSc ? sistConserPorLayer.get(key) : '';
+    if (!temSc) semSistConser++;
+    const periodoOp = r.mes_plantio ? Number(r.mes_plantio.split('-')[1]) : null;
+    porLayer.set(layer, {
+      layer, periodo_op: periodoOp, cod_faz: r.cod_faz, fazenda: r.fazenda, talhao: r.talhao,
+      area_ha: areaHa, mes_plantio: r.mes_plantio, ciclo: r.ciclo, ambiente: r.ambiente,
+      sist_conser: sistConser, bloco_id: r.bloco_id,
+    });
+  }
+
+  return {
+    talhoes: [...porLayer.values()],
+    resumo: { nLinhas, nExplodidos: exploded.length, nAdmin, nIgnoradas, nFalhaTalhao, semArea, semSistConser, avisos },
+  };
+}
+
+async function enviarAtualizacaoDemanda() {
+  const fileSeq    = document.getElementById('inputSeqPlantio').files[0];
+  const filesPrep  = [...document.getElementById('inputPreparo').files];
+  const fileBase   = document.getElementById('inputBaseFazendas').files[0] || null;
+  const btn = document.getElementById('btnAtualizarDemanda');
+  const log = document.getElementById('demandaLog');
+  if (log) log.innerHTML = '';
+  if (!fileSeq || !filesPrep.length) return;
+
+  btn.disabled = true;
+  try {
+    _logDemanda('Lendo planilhas...');
+    const { talhoes, resumo } = await processarArquivosDemanda(fileSeq, filesPrep, fileBase);
+    _logDemanda(`${resumo.nLinhas} bloco(s) de demanda, ${resumo.nExplodidos} talhão(ões) explodido(s).`);
+    if (resumo.nAdmin)       _logDemanda(`Filtro administrativo (COD FAZ ${CODFAZ_EXCLUIR_PREFIXO}x): ${resumo.nAdmin} linha(s) excluída(s).`);
+    if (resumo.nIgnoradas)   _logDemanda(`${resumo.nIgnoradas} linha(s) parcial(is) ignorada(s) (faltava Código/Seção/Talhões).`);
+    if (resumo.nFalhaTalhao) _logDemanda(`${resumo.nFalhaTalhao} linha(s) com TALHÕES não interpretável.`);
+    resumo.avisos.forEach(a => _logDemanda(`<span style="color:var(--accent)">⚠ ${escapeHtml(a)}</span>`));
+
+    if (!talhoes.length) {
+      _logDemanda('<span style="color:var(--red)">Nenhum talhão pra enviar — confira as planilhas selecionadas.</span>');
+      return;
+    }
+
+    _logDemanda(`Enviando ${talhoes.length} registro(s) pro servidor...`);
+    const res = await fetch(`${RELEASE_PROXY_URL}/importar-demanda`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ talhoes }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const r = await res.json();
+
+    _logDemanda('<span style="color:var(--green);font-weight:700">Atualização concluída!</span>');
+    _logDemanda(`Registros enviados: ${r.totalEnviado} (novos: ${r.novos}, preservados: ${r.preservados})`);
+    _logDemanda(`Status corrigido (Pendente ⇄ Aguard. Map.): ${r.corrigidos}. Mapeamento auto-corrigido p/ Sim: ${r.mapeamentoCorrigido}.`);
+    if (r.semArea)       _logDemanda(`⚠ ${r.semArea} talhão(ões) sem área (area_ha = 0).`);
+    if (r.semSistConser) _logDemanda(`⚠ ${r.semSistConser} talhão(ões) ainda sem Sist. Conser.`);
+    if (r.removidos && r.removidos.length) {
+      _logDemanda(`<span style="color:var(--accent)">⚠ ${r.removidos.length} LAYER(s) preenchidos não estão na nova base (dado continua salvo, só não recebe mais atualização):</span>`);
+      r.removidos.slice(0, 10).forEach(rm => _logDemanda(`&nbsp;&nbsp;LAYER ${rm.layer}: mapeamento=${escapeHtml(rm.mapeamento)} | projeto=${escapeHtml(rm.projeto)}`));
+    }
+
+    showToast('Demanda atualizada com sucesso.');
+    await carregarDadosSupabase();
+    populateMesFilter();
+    filterFazendas(document.getElementById('searchFaz')?.value || '');
+    updateStats();
+    if (document.getElementById('viewDashboard').style.display !== 'none') renderDashboard();
+  } catch (e) {
+    _logDemanda(`<span style="color:var(--red)">Erro: ${escapeHtml(e.message)}</span>`);
+    showToast(`Erro ao atualizar demanda: ${e.message}`);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Sincronizar Planilha (entrega o sincronizador na pasta de rede) ───────
+// File System Access API — só Chrome/Edge. O handle de diretório fica salvo
+// no IndexedDB pra não pedir a pasta de novo a cada visita (o navegador pode
+// pedir uma reconfirmação rápida de permissão de tempos em tempos).
+const SYNC_DB_NAME  = 'plantio_fs';
+const SYNC_DB_STORE = 'handles';
+const SYNC_DB_KEY   = 'pastaPlanilha';
+
+function _syncDbAbrir() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(SYNC_DB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(SYNC_DB_STORE);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => reject(req.error);
+  });
+}
+
+async function _syncDbSalvarHandle(handle) {
+  const db = await _syncDbAbrir();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(SYNC_DB_STORE, 'readwrite');
+    tx.objectStore(SYNC_DB_STORE).put(handle, SYNC_DB_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror    = () => reject(tx.error);
+  });
+}
+
+async function _syncDbLerHandle() {
+  const db = await _syncDbAbrir();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(SYNC_DB_STORE, 'readonly');
+    const req = tx.objectStore(SYNC_DB_STORE).get(SYNC_DB_KEY);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror   = () => reject(req.error);
+  });
+}
+
+let _pastaPlanilhaHandle = null;
+
+function suportaFileSystemAccess() {
+  return typeof window.showDirectoryPicker === 'function';
+}
+
+async function atualizarStatusPastaPlanilha() {
+  const statusEl = document.getElementById('pastaPlanilhaStatus');
+  const btnInstalar = document.getElementById('btnInstalarSync');
+  if (!statusEl || !btnInstalar) return;
+
+  if (!suportaFileSystemAccess()) {
+    statusEl.textContent = '⚠ Este navegador não suporta essa funcionalidade — use Chrome ou Edge.';
+    btnInstalar.disabled = true;
+    return;
+  }
+
+  try { _pastaPlanilhaHandle = await _syncDbLerHandle(); }
+  catch (e) { _pastaPlanilhaHandle = null; }
+
+  if (!_pastaPlanilhaHandle) {
+    statusEl.textContent = 'Nenhuma pasta configurada.';
+    btnInstalar.disabled = true;
+    return;
+  }
+
+  const permissao = await _pastaPlanilhaHandle.queryPermission({ mode: 'readwrite' });
+  if (permissao === 'granted') {
+    statusEl.textContent = `Pasta configurada: "${_pastaPlanilhaHandle.name}".`;
+    btnInstalar.disabled = false;
+  } else {
+    statusEl.textContent = `Pasta "${_pastaPlanilhaHandle.name}" configurada, mas a permissão precisa ser reconfirmada — clique em "Escolher pasta da planilha" de novo.`;
+    btnInstalar.disabled = true;
+  }
+}
+
+async function escolherPastaPlanilha() {
+  if (!suportaFileSystemAccess()) {
+    showToast('Esse navegador não suporta essa funcionalidade — use Chrome ou Edge.');
+    return;
+  }
+  try {
+    const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    await _syncDbSalvarHandle(handle);
+    _pastaPlanilhaHandle = handle;
+    showToast(`Pasta "${handle.name}" configurada.`);
+    atualizarStatusPastaPlanilha();
+  } catch (e) {
+    if (e.name !== 'AbortError') showToast(`Erro ao escolher pasta: ${e.message}`);
+  }
+}
+
+const ARQUIVOS_SINCRONIZADOR = [
+  'SINCRONIZAR_PLANILHA.bat',
+  'engine/sincronizar_planilha.py',
+  'engine/utils.py',
+  'engine/requirements.txt',
+  'supabase_config.example.json',
+  'planilha_config.example.json',
+];
+
+function _logSync(msg) {
+  const el = document.getElementById('syncLog');
+  if (el) el.insertAdjacentHTML('beforeend', `<div>${msg}</div>`);
+}
+
+async function instalarArquivosSync() {
+  if (!_pastaPlanilhaHandle) return;
+  const log = document.getElementById('syncLog');
+  if (log) log.innerHTML = '';
+  const btn = document.getElementById('btnInstalarSync');
+  btn.disabled = true;
+
+  try {
+    const permissao = await _pastaPlanilhaHandle.requestPermission({ mode: 'readwrite' });
+    if (permissao !== 'granted') throw new Error('permissão de escrita negada');
+
+    for (const caminho of ARQUIVOS_SINCRONIZADOR) {
+      _logSync(`Copiando ${caminho}...`);
+      const resp = await fetch(caminho);
+      if (!resp.ok) throw new Error(`${caminho}: ${resp.status}`);
+      const conteudo = await resp.blob();
+
+      const partes = caminho.split('/');
+      let pasta = _pastaPlanilhaHandle;
+      for (let i = 0; i < partes.length - 1; i++) {
+        pasta = await pasta.getDirectoryHandle(partes[i], { create: true });
+      }
+      const fileHandle = await pasta.getFileHandle(partes[partes.length - 1], { create: true });
+      const writable = await fileHandle.createWritable();
+      await writable.write(conteudo);
+      await writable.close();
+      _logSync(`<span style="color:var(--green)">✓ ${caminho}</span>`);
+    }
+
+    _logSync('<span style="color:var(--green);font-weight:700">Arquivos instalados! Se ainda não tiver feito, falta só configurar supabase_config.json e planilha_config.json com os dados reais (ver SETUP.md).</span>');
+    showToast('Arquivos do sincronizador instalados na pasta.');
+  } catch (e) {
+    _logSync(`<span style="color:var(--red)">Erro: ${escapeHtml(e.message)}</span>`);
+    showToast(`Erro ao instalar arquivos: ${e.message}`);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+
 // ── User management ───────────────────────────────────────────────────────
 
 // Config local (espelho editável em sessão; fonte da verdade = USUARIOS_CONFIG injetado pelo Python)
@@ -2140,18 +2599,24 @@ function applyUserPermissions(nome) {
   const perfis = getUserPerfis(nome);
   const hasDash  = perfis.includes('dashboard');
   const hasPreench = perfis.includes('preenchimento');
+  const hasAdmin = perfis.includes('admin');
   document.getElementById('tabDash').style.display     = hasDash    ? '' : 'none';
   document.getElementById('tabConsulta').style.display = hasDash    ? '' : 'none';
   document.getElementById('tabWork').style.display     = hasPreench ? '' : 'none';
+  document.getElementById('tabAdmin').style.display    = hasAdmin   ? '' : 'none';
   const vd = document.getElementById('viewDashboard').style.display;
   const vc = document.getElementById('viewConsulta').style.display;
+  const va = document.getElementById('viewAdmin').style.display;
   const currentView = vd !== 'none' ? 'dashboard'
                     : vc !== 'none' ? 'consulta'
+                    : va !== 'none' ? 'admin'
                     : 'preenchimento';
   if ((currentView === 'dashboard' || currentView === 'consulta') && !hasDash) {
-    setView(hasPreench ? 'preenchimento' : 'dashboard');
+    setView(hasPreench ? 'preenchimento' : hasAdmin ? 'admin' : 'dashboard');
   } else if (currentView === 'preenchimento' && !hasPreench) {
-    setView(hasDash ? 'dashboard' : 'preenchimento');
+    setView(hasDash ? 'dashboard' : hasAdmin ? 'admin' : 'preenchimento');
+  } else if (currentView === 'admin' && !hasAdmin) {
+    setView(hasPreench ? 'preenchimento' : hasDash ? 'dashboard' : 'admin');
   }
 }
 
@@ -2186,8 +2651,6 @@ function selectUserChip(name) {
 
 function openUserModal() {
   renderUserChips();
-  document.getElementById('modalSelectSection').style.display = '';
-  document.getElementById('modalAdminSection').style.display  = 'none';
   const el = document.getElementById('modalOverlay');
   el.style.display = '';
   el.classList.add('open');
@@ -2223,19 +2686,9 @@ async function _chamarRemoverUsuario(nome) {
   if (!res.ok) throw new Error(await res.text());
 }
 
-function openAdminSection() {
-  document.getElementById('modalSelectSection').style.display = 'none';
-  document.getElementById('modalAdminSection').style.display  = '';
-  renderAdminList();
-}
-function closeAdminSection() {
-  document.getElementById('modalSelectSection').style.display = '';
-  document.getElementById('modalAdminSection').style.display  = 'none';
-  renderUserChips();
-}
-
 function renderAdminList() {
   const el = document.getElementById('adminUserList');
+  if (!el) return;
   if (!adminConfig.length) {
     el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:4px 0">Nenhum usuário cadastrado.</div>';
     return;
@@ -2243,6 +2696,7 @@ function renderAdminList() {
   el.innerHTML = adminConfig.map((u, idx) => {
     const hasP = u.perfis.includes('preenchimento');
     const hasD = u.perfis.includes('dashboard');
+    const hasA = u.perfis.includes('admin');
     return `<div class="admin-user-row">
       <span class="admin-user-name">${escapeHtml(u.nome)}</span>
       <label class="admin-perfil-check">
@@ -2250,6 +2704,9 @@ function renderAdminList() {
       </label>
       <label class="admin-perfil-check">
         <input type="checkbox" ${hasD ? 'checked' : ''} onchange="adminTogglePerfil(${idx},'dashboard',this.checked)"> Dashboard
+      </label>
+      <label class="admin-perfil-check">
+        <input type="checkbox" ${hasA ? 'checked' : ''} onchange="adminTogglePerfil(${idx},'admin',this.checked)"> Admin
       </label>
       <button class="user-chip-del" onclick="adminRemoveUser(${idx})" title="remover">&#215;</button>
     </div>`;
@@ -2293,6 +2750,7 @@ async function adminAddUser() {
   const perfis = [];
   if (document.getElementById('chkPreenchimento').checked) perfis.push('preenchimento');
   if (document.getElementById('chkDashboard').checked)     perfis.push('dashboard');
+  if (document.getElementById('chkAdmin').checked)         perfis.push('admin');
   if (!perfis.length) { alert('Selecione pelo menos um perfil.'); return; }
   try {
     await _chamarUpsertUsuario(nome, perfis);
@@ -2317,11 +2775,14 @@ function setView(name) {
   document.getElementById('viewDashboard').style.display     = name === 'dashboard'    ? '' : 'none';
   document.getElementById('viewPreenchimento').style.display = name === 'preenchimento' ? '' : 'none';
   document.getElementById('viewConsulta').style.display      = name === 'consulta'     ? '' : 'none';
+  document.getElementById('viewAdmin').style.display         = name === 'admin'        ? '' : 'none';
   document.getElementById('tabDash').classList.toggle('active', name === 'dashboard');
   document.getElementById('tabWork').classList.toggle('active', name === 'preenchimento');
   document.getElementById('tabConsulta').classList.toggle('active', name === 'consulta');
+  document.getElementById('tabAdmin').classList.toggle('active', name === 'admin');
   if (name === 'dashboard') renderDashboard();
   if (name === 'consulta')  { populateConsultaFilters(); renderConsulta(); }
+  if (name === 'admin')     { renderAdminList(); atualizarStatusPastaPlanilha(); }
 }
 
 // ── Status por fazenda (rollup do Projeto entre todos os talhões) ─────────

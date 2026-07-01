@@ -2,13 +2,19 @@
 sincronizar_planilha.py
 Uso: python sincronizar_planilha.py  OU  duplo clique no SINCRONIZAR_PLANILHA.bat
 
+Pensado pra rodar direto na pasta de rede onde a Sequência de Plantio mora —
+a tela Admin → "Sincronizar Planilha" do formulario.html ajuda a colocar este
+script (+ utils.py + requirements.txt) ali usando a File System Access API do
+navegador (Chrome/Edge). Por isso a planilha é procurada no diretório atual
+(*.xlsx), não numa subpasta.
+
 Lê a tabela `programacao` do Supabase, agrupa por `bloco_id` (a mesma chave
-calculada em atualizar_programacao.py: COD FAZ + MÊS DE PLANTIO + texto bruto
-de TALHÕES), aplica o rollup de Sist. Conser. por bloco e escreve de volta nas
+que já era calculada na importação: COD FAZ + MÊS DE PLANTIO + texto bruto de
+TALHÕES), aplica o rollup de Sist. Conser. por bloco e escreve de volta nas
 colunas Z (Sist. Conser.) / AA (Mapeamento) / AB (Projeto / Mapa) da aba
-"Sequencia" em base_plantio/*.xlsx — localizando cada linha pelo mesmo bloco_id
-recalculado a partir do conteúdo atual da planilha (sobrevive a reordenação de
-linhas, mas não a uma edição de Código/Mês de Plantio/Talhões entre sincronizações).
+"Sequencia" — localizando cada linha pelo mesmo bloco_id recalculado a partir
+do conteúdo atual da planilha (sobrevive a reordenação de linhas, mas não a
+uma edição de Código/Mês de Plantio/Talhões entre sincronizações).
 
 Por quê Excel real (xlwings) em vez de openpyxl para escrever: a aba "Sequencia"
 tem mais de 100 regras de formatação condicional e várias listas de validação
@@ -105,15 +111,19 @@ for bloco_id, rows in _por_bloco.items():
 print(f"  {len(blocos)} bloco(s) carregado(s) do Supabase.\n")
 
 # ── 2. Localiza, por leitura (openpyxl), as linhas que batem com cada bloco ──
+# Planilha procurada no diretório atual (este script roda na mesma pasta de
+# rede onde ela mora — ver docstring no topo do arquivo). Ignora os arquivos
+# de lock temporário do Excel ("~$nome.xlsx", criados enquanto o arquivo está
+# aberto em outra instância).
 print("Localizando linhas na planilha de Sequência de Plantio...")
-_plantio_found = _glob.glob("base_plantio/*.xlsx")
+_plantio_found = [f for f in _glob.glob("*.xlsx") if not os.path.basename(f).startswith('~$')]
 if not _plantio_found:
-    print("ERRO: Nenhum arquivo .xlsx encontrado em base_plantio/")
+    print("ERRO: Nenhum arquivo .xlsx encontrado nesta pasta.")
     fechar_log(_log_fh)
     input("\nPressione Enter para sair...")
     sys.exit(1)
 if len(_plantio_found) > 1:
-    print(f"  AVISO: {len(_plantio_found)} arquivos em base_plantio/ — usando o primeiro encontrado "
+    print(f"  AVISO: {len(_plantio_found)} arquivos .xlsx nesta pasta — usando o primeiro encontrado "
           f"({_plantio_found[0]}); remova os demais pra evitar ambiguidade.")
 SOURCE_PLANTIO = os.path.abspath(_plantio_found[0])
 print(f"  Planilha de plantio: {SOURCE_PLANTIO}")
@@ -161,7 +171,7 @@ for i, row in enumerate(ws_ro.iter_rows(min_row=header_row + 1, max_row=ws_ro.ma
 print(f"  {len(linhas_para_escrever)} linha(s) encontrada(s) pra atualizar.")
 if blocos_restantes:
     print(f"  ⚠  {len(blocos_restantes)} bloco(s) do Supabase não encontrados na planilha "
-          f"(Código/Mês de Plantio/Talhões pode ter sido editado desde o último ATUALIZAR.bat):")
+          f"(Código/Mês de Plantio/Talhões pode ter sido editado desde a última Atualização de Demanda):")
     for b in sorted(blocos_restantes)[:10]:
         print(f"     {b}")
     if len(blocos_restantes) > 10:
