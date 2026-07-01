@@ -883,6 +883,47 @@
     font-size: 10px; font-weight: 700; text-transform: uppercase;
     letter-spacing: 1.5px; color: var(--muted); margin-bottom: 16px;
   }
+
+  /* ── Painel Admin (gaveta deslizante) ── */
+  .admin-overlay {
+    position: fixed; inset: 0; z-index: 299;
+    background: rgba(0,0,0,.35); display: none;
+  }
+  .admin-overlay.open { display: block; }
+  .admin-panel {
+    position: fixed; top: 60px; right: 0;
+    width: 420px; max-width: 96vw; height: calc(100vh - 60px);
+    background: var(--surface); border-left: 1px solid var(--border);
+    overflow-y: auto; z-index: 300;
+    transform: translateX(100%);
+    transition: transform .25s cubic-bezier(.4,0,.2,1);
+    box-shadow: -6px 0 28px rgba(0,0,0,.22);
+  }
+  .admin-panel.open { transform: translateX(0); }
+  .admin-panel::-webkit-scrollbar { width: 4px; }
+  .admin-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .admin-panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; border-bottom: 1px solid var(--border);
+    background: var(--surface2); position: sticky; top: 0; z-index: 1;
+  }
+  .admin-panel-title {
+    font-size: 12px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .admin-panel-close {
+    background: none; border: none; color: var(--muted); font-size: 18px;
+    line-height: 1; cursor: pointer; padding: 2px 4px; border-radius: 4px;
+    transition: color .12s;
+  }
+  .admin-panel-close:hover { color: var(--text); }
+  .admin-panel-body { padding: 18px; display: flex; flex-direction: column; gap: 20px; }
+  .admin-panel-section-title {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1.5px; color: var(--muted); margin-bottom: 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .admin-panel-section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 </style>
 </head>
 <body>
@@ -899,9 +940,9 @@
     <button class="nav-tab active" id="tabDash" onclick="setView('dashboard')">Dashboards</button>
     <button class="nav-tab" id="tabWork" onclick="setView('preenchimento')">Registros</button>
     <button class="nav-tab" id="tabConsulta" onclick="setView('consulta')">Consultas</button>
-    <button class="nav-tab" id="tabAdmin" onclick="setView('admin')" style="display:none">Admin</button>
   </nav>
   <div class="header-right">
+    <div class="theme-toggle" id="adminToggle" onclick="toggleAdminPanel()" title="Admin" style="display:none">&#9776;</div>
     <div class="theme-toggle" onclick="toggleTheme()" id="themeToggle" title="Alternar tema">&#9790;</div>
     <div class="user-badge" onclick="openUserModal()" id="userBadge">Selecionar usuário</div>
   </div>
@@ -1144,78 +1185,73 @@
   <div id="consultaResults"></div>
 </div>
 
-<!-- ══ Tela 4: Admin ══════════════════════════════════════════════════════ -->
-<div id="viewAdmin" class="dash-page" style="display:none">
+<!-- Backdrop do painel Admin -->
+<div id="adminOverlay" class="admin-overlay" onclick="closeAdminPanel()"></div>
 
-  <!-- Usuários -->
-  <div class="form-card">
-    <div class="form-card-header">
-      <div class="form-card-title">Usuários</div>
-    </div>
-    <div class="form-card-body">
-      <div id="adminUserList" style="max-height:260px;overflow-y:auto"></div>
+<!-- Painel Admin (gaveta deslizante pela direita) -->
+<div id="adminPanel" class="admin-panel">
+  <div class="admin-panel-header">
+    <span class="admin-panel-title">Admin</span>
+    <button class="admin-panel-close" onclick="closeAdminPanel()" title="Fechar">&#10005;</button>
+  </div>
+  <div class="admin-panel-body">
+
+    <!-- Usuários -->
+    <div>
+      <div class="admin-panel-section-title">Usuários</div>
+      <div id="adminUserList" style="max-height:240px;overflow-y:auto"></div>
       <div class="admin-section">
-        <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px">Novo usuário</label>
-        <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap">
-          <input type="text" id="inputAdminUser" placeholder="Nome" style="flex:1;min-width:140px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;color:var(--text);font-family:inherit;font-size:13px">
+        <label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px">Novo usuário</label>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap">
+          <input type="text" id="inputAdminUser" placeholder="Nome" style="flex:1;min-width:100px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:7px 9px;color:var(--text);font-family:inherit;font-size:12px">
           <label class="admin-perfil-check"><input type="checkbox" id="chkPreenchimento" checked> Preencher</label>
           <label class="admin-perfil-check"><input type="checkbox" id="chkDashboard" checked> Dashboard</label>
           <label class="admin-perfil-check"><input type="checkbox" id="chkAdmin"> Admin</label>
-          <button class="btn-modal-ok" onclick="adminAddUser()" style="padding:8px 14px;white-space:nowrap">+</button>
+          <button class="btn-modal-ok" onclick="adminAddUser()" style="padding:7px 12px;white-space:nowrap">+</button>
         </div>
       </div>
-      <p class="admin-note">Mudanças aqui (adicionar/remover usuário, trocar perfil) são salvas direto no Supabase e já valem pra todo mundo.</p>
+      <p class="admin-note">Mudanças são salvas direto no Supabase e já valem pra todo mundo.</p>
     </div>
-  </div>
 
-  <!-- Atualizar Demanda -->
-  <div class="form-card">
-    <div class="form-card-header">
-      <div class="form-card-title">Atualizar Demanda</div>
-    </div>
-    <div class="form-card-body">
-      <p class="admin-note" style="margin-bottom:14px">Seleciona a Sequência de Plantio e o(s) arquivo(s) de Preparo
-        (Base de Fazendas é opcional — sem ela, a área de talhões novos fica 0). Substitui o antigo ATUALIZAR.bat.</p>
-      <div style="display:flex;flex-direction:column;gap:10px;max-width:480px">
+    <!-- Atualizar Demanda -->
+    <div>
+      <div class="admin-panel-section-title">Atualizar Demanda</div>
+      <p class="admin-note" style="margin-bottom:12px">Seleciona a Sequência de Plantio e o(s) arquivo(s) de Preparo
+        (Base de Fazendas opcional). Substitui o antigo ATUALIZAR.bat.</p>
+      <div style="display:flex;flex-direction:column;gap:9px">
         <div>
-          <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:4px">Sequência de Plantio</label>
+          <label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:4px">Sequência de Plantio</label>
           <input type="file" id="inputSeqPlantio" accept=".xlsx" onchange="atualizarBotaoDemanda()">
         </div>
         <div>
-          <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:4px">Preparo (pode selecionar mais de um arquivo)</label>
+          <label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:4px">Preparo (pode selecionar mais de um)</label>
           <input type="file" id="inputPreparo" accept=".xlsx" multiple onchange="atualizarBotaoDemanda()">
         </div>
         <div>
-          <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:4px">Base de Fazendas (opcional)</label>
+          <label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:4px">Base de Fazendas (opcional)</label>
           <input type="file" id="inputBaseFazendas" accept=".xlsx,.xls">
         </div>
       </div>
-      <div style="margin-top:14px">
+      <div style="margin-top:12px">
         <button class="btn-submit" id="btnAtualizarDemanda" onclick="enviarAtualizacaoDemanda()" disabled>Atualizar →</button>
       </div>
-      <div id="demandaLog" style="margin-top:12px;font-size:12px;line-height:1.8"></div>
+      <div id="demandaLog" style="margin-top:10px;font-size:11px;line-height:1.7"></div>
     </div>
-  </div>
 
-  <!-- Sincronizar Planilha -->
-  <div class="form-card">
-    <div class="form-card-header">
-      <div class="form-card-title">Sincronizar Planilha <span class="frente-tag">Chrome/Edge</span></div>
-    </div>
-    <div class="form-card-body">
-      <p class="admin-note" style="margin-bottom:14px">Ajuda a colocar o sincronizador (escreve Sist. Conser./Mapeamento/Projeto
-        de volta na planilha, usando o Excel de verdade) direto na pasta de rede onde a Sequência de Plantio mora.
-        Funciona só em Chrome/Edge. Depois de instalado, é só dar duplo clique no <strong>SINCRONIZAR_PLANILHA.bat</strong>
-        na pasta sempre que quiser atualizar o status na planilha — essa parte continua manual.</p>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:10px" id="pastaPlanilhaStatus">Nenhuma pasta configurada.</div>
+    <!-- Sincronizar Planilha -->
+    <div>
+      <div class="admin-panel-section-title">Sincronizar Planilha <span class="frente-tag">Chrome/Edge</span></div>
+      <p class="admin-note" style="margin-bottom:10px">Instala o sincronizador direto na pasta de rede da planilha.
+        Depois é só dar duplo clique no <strong>SINCRONIZAR_PLANILHA.bat</strong> quando quiser atualizar o status.</p>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px" id="pastaPlanilhaStatus">Nenhuma pasta configurada.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn-modal-cancel" onclick="escolherPastaPlanilha()">📁 Escolher pasta da planilha</button>
-        <button class="btn-modal-ok" id="btnInstalarSync" onclick="instalarArquivosSync()" disabled>Instalar/atualizar arquivos</button>
+        <button class="btn-modal-cancel" onclick="escolherPastaPlanilha()">📁 Escolher pasta</button>
+        <button class="btn-modal-ok" id="btnInstalarSync" onclick="instalarArquivosSync()" disabled>Instalar/atualizar</button>
       </div>
-      <div id="syncLog" style="margin-top:12px;font-size:12px;line-height:1.8"></div>
+      <div id="syncLog" style="margin-top:10px;font-size:11px;line-height:1.7"></div>
     </div>
-  </div>
 
+  </div>
 </div>
 
 <!-- Context Menu -->
@@ -1643,7 +1679,7 @@ function ctxAddToPlan() {
 }
 document.addEventListener('click',   e => { if (!document.getElementById('ctxMenu').contains(e.target)) closeCtxMenu(); });
 document.addEventListener('scroll',  () => closeCtxMenu(), true);
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeCtxMenu(); closePlanCtxMenu(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeCtxMenu(); closePlanCtxMenu(); closeAdminPanel(); } });
 document.addEventListener('click',   e => { if (!document.getElementById('planCtxMenu').contains(e.target)) closePlanCtxMenu(); });
 document.addEventListener('scroll',  () => closePlanCtxMenu(), true);
 
@@ -2597,27 +2633,38 @@ function getSelectableUsers() {
 
 function applyUserPermissions(nome) {
   const perfis = getUserPerfis(nome);
-  const hasDash  = perfis.includes('dashboard');
+  const hasDash    = perfis.includes('dashboard');
   const hasPreench = perfis.includes('preenchimento');
-  const hasAdmin = perfis.includes('admin');
+  const hasAdmin   = perfis.includes('admin');
   document.getElementById('tabDash').style.display     = hasDash    ? '' : 'none';
   document.getElementById('tabConsulta').style.display = hasDash    ? '' : 'none';
   document.getElementById('tabWork').style.display     = hasPreench ? '' : 'none';
-  document.getElementById('tabAdmin').style.display    = hasAdmin   ? '' : 'none';
+  document.getElementById('adminToggle').style.display = hasAdmin   ? '' : 'none';
+  if (!hasAdmin) closeAdminPanel();
   const vd = document.getElementById('viewDashboard').style.display;
   const vc = document.getElementById('viewConsulta').style.display;
-  const va = document.getElementById('viewAdmin').style.display;
   const currentView = vd !== 'none' ? 'dashboard'
                     : vc !== 'none' ? 'consulta'
-                    : va !== 'none' ? 'admin'
                     : 'preenchimento';
   if ((currentView === 'dashboard' || currentView === 'consulta') && !hasDash) {
-    setView(hasPreench ? 'preenchimento' : hasAdmin ? 'admin' : 'dashboard');
+    setView(hasPreench ? 'preenchimento' : 'dashboard');
   } else if (currentView === 'preenchimento' && !hasPreench) {
-    setView(hasDash ? 'dashboard' : hasAdmin ? 'admin' : 'preenchimento');
-  } else if (currentView === 'admin' && !hasAdmin) {
-    setView(hasPreench ? 'preenchimento' : hasDash ? 'dashboard' : 'admin');
+    setView(hasDash ? 'dashboard' : 'preenchimento');
   }
+}
+
+function toggleAdminPanel() {
+  const panel = document.getElementById('adminPanel');
+  if (panel.classList.contains('open')) { closeAdminPanel(); return; }
+  panel.classList.add('open');
+  document.getElementById('adminOverlay').classList.add('open');
+  renderAdminList();
+  atualizarStatusPastaPlanilha();
+}
+
+function closeAdminPanel() {
+  document.getElementById('adminPanel')?.classList.remove('open');
+  document.getElementById('adminOverlay')?.classList.remove('open');
 }
 
 function renderUserChips() {
@@ -2775,14 +2822,11 @@ function setView(name) {
   document.getElementById('viewDashboard').style.display     = name === 'dashboard'    ? '' : 'none';
   document.getElementById('viewPreenchimento').style.display = name === 'preenchimento' ? '' : 'none';
   document.getElementById('viewConsulta').style.display      = name === 'consulta'     ? '' : 'none';
-  document.getElementById('viewAdmin').style.display         = name === 'admin'        ? '' : 'none';
   document.getElementById('tabDash').classList.toggle('active', name === 'dashboard');
   document.getElementById('tabWork').classList.toggle('active', name === 'preenchimento');
   document.getElementById('tabConsulta').classList.toggle('active', name === 'consulta');
-  document.getElementById('tabAdmin').classList.toggle('active', name === 'admin');
   if (name === 'dashboard') renderDashboard();
   if (name === 'consulta')  { populateConsultaFilters(); renderConsulta(); }
-  if (name === 'admin')     { renderAdminList(); atualizarStatusPastaPlanilha(); }
 }
 
 // ── Status por fazenda (rollup do Projeto entre todos os talhões) ─────────
