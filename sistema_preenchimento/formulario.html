@@ -1254,14 +1254,24 @@
     <!-- Sincronizar Planilha -->
     <div>
       <div class="admin-panel-section-title">Sincronizar Planilha <span class="frente-tag">Chrome/Edge</span></div>
-      <p class="admin-note" style="margin-bottom:10px">Instala o sincronizador direto na pasta de rede da planilha.
-        Depois é só dar duplo clique no <strong>SINCRONIZAR_PLANILHA.bat</strong> quando quiser atualizar o status.</p>
+
+      <label class="admin-label">Sequência de Plantio</label>
+      <p class="admin-note" style="margin-bottom:8px">Instala o <strong>SINCRONIZAR_PLANILHA.bat</strong> na pasta da planilha para escrever de volta o status.</p>
       <div style="font-size:11px;color:var(--muted);margin-bottom:8px" id="pastaPlanilhaStatus">Nenhuma pasta configurada.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn-outline" onclick="escolherPastaPlanilha()">Escolher pasta</button>
         <button class="btn-submit" id="btnInstalarSync" onclick="instalarArquivosSync()" disabled>Instalar/atualizar</button>
       </div>
-      <div id="syncLog" style="margin-top:10px;font-size:11px;line-height:1.7"></div>
+      <div id="syncLog" style="margin-top:8px;font-size:11px;line-height:1.7"></div>
+
+      <label class="admin-label" style="margin-top:16px">Preparo</label>
+      <p class="admin-note" style="margin-bottom:8px">Lê todos os .xlsx da pasta e atualiza o Sist. Conser. no sistema.</p>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px" id="pastaPreparoStatus">Nenhuma pasta configurada.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-outline" onclick="escolherPastaPrep()">Escolher pasta</button>
+        <button class="btn-submit" id="btnCarregarPrep" onclick="carregarPrep()" disabled>Carregar e atualizar →</button>
+      </div>
+      <div id="prepSyncLog" style="margin-top:8px;font-size:11px;line-height:1.7"></div>
     </div>
 
   </div>
@@ -2571,9 +2581,10 @@ async function enviarAtualizacaoPreparo() {
 // File System Access API — só Chrome/Edge. O handle de diretório fica salvo
 // no IndexedDB pra não pedir a pasta de novo a cada visita (o navegador pode
 // pedir uma reconfirmação rápida de permissão de tempos em tempos).
-const SYNC_DB_NAME  = 'plantio_fs';
-const SYNC_DB_STORE = 'handles';
-const SYNC_DB_KEY   = 'pastaPlanilha';
+const SYNC_DB_NAME     = 'plantio_fs';
+const SYNC_DB_STORE    = 'handles';
+const SYNC_DB_KEY      = 'pastaPlanilha';
+const SYNC_DB_KEY_PREP = 'pastaPrep';
 
 function _syncDbAbrir() {
   return new Promise((resolve, reject) => {
@@ -2584,75 +2595,131 @@ function _syncDbAbrir() {
   });
 }
 
-async function _syncDbSalvarHandle(handle) {
+async function _syncDbSalvarHandle(handle, key) {
   const db = await _syncDbAbrir();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(SYNC_DB_STORE, 'readwrite');
-    tx.objectStore(SYNC_DB_STORE).put(handle, SYNC_DB_KEY);
+    tx.objectStore(SYNC_DB_STORE).put(handle, key || SYNC_DB_KEY);
     tx.oncomplete = () => resolve();
     tx.onerror    = () => reject(tx.error);
   });
 }
 
-async function _syncDbLerHandle() {
+async function _syncDbLerHandle(key) {
   const db = await _syncDbAbrir();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(SYNC_DB_STORE, 'readonly');
-    const req = tx.objectStore(SYNC_DB_STORE).get(SYNC_DB_KEY);
+    const req = tx.objectStore(SYNC_DB_STORE).get(key || SYNC_DB_KEY);
     req.onsuccess = () => resolve(req.result || null);
     req.onerror   = () => reject(req.error);
   });
 }
 
 let _pastaPlanilhaHandle = null;
+let _pastaPreparoHandle  = null;
 
 function suportaFileSystemAccess() {
   return typeof window.showDirectoryPicker === 'function';
 }
 
-async function atualizarStatusPastaPlanilha() {
-  const statusEl = document.getElementById('pastaPlanilhaStatus');
-  const btnInstalar = document.getElementById('btnInstalarSync');
-  if (!statusEl || !btnInstalar) return;
-
+async function _atualizarStatusPasta(dbKey, statusId, btnId, mode) {
+  const statusEl = document.getElementById(statusId);
+  const btn = document.getElementById(btnId);
+  if (!statusEl || !btn) return null;
   if (!suportaFileSystemAccess()) {
-    statusEl.textContent = '⚠ Este navegador não suporta essa funcionalidade — use Chrome ou Edge.';
-    btnInstalar.disabled = true;
-    return;
+    statusEl.textContent = '⚠ Use Chrome ou Edge para esta funcionalidade.';
+    btn.disabled = true;
+    return null;
   }
-
-  try { _pastaPlanilhaHandle = await _syncDbLerHandle(); }
-  catch (e) { _pastaPlanilhaHandle = null; }
-
-  if (!_pastaPlanilhaHandle) {
-    statusEl.textContent = 'Nenhuma pasta configurada.';
-    btnInstalar.disabled = true;
-    return;
-  }
-
-  const permissao = await _pastaPlanilhaHandle.queryPermission({ mode: 'readwrite' });
-  if (permissao === 'granted') {
-    statusEl.textContent = `Pasta configurada: "${_pastaPlanilhaHandle.name}".`;
-    btnInstalar.disabled = false;
+  let handle = null;
+  try { handle = await _syncDbLerHandle(dbKey); } catch (e) { handle = null; }
+  if (!handle) { statusEl.textContent = 'Nenhuma pasta configurada.'; btn.disabled = true; return null; }
+  const perm = await handle.queryPermission({ mode });
+  if (perm === 'granted') {
+    statusEl.textContent = `Pasta configurada: "${handle.name}".`;
+    btn.disabled = false;
   } else {
-    statusEl.textContent = `Pasta "${_pastaPlanilhaHandle.name}" configurada, mas a permissão precisa ser reconfirmada — clique em "Escolher pasta da planilha" de novo.`;
-    btnInstalar.disabled = true;
+    statusEl.textContent = `"${handle.name}" — clique em "Escolher pasta" pra reconfirmar.`;
+    btn.disabled = true;
+  }
+  return handle;
+}
+
+async function atualizarStatusPastaPlanilha() {
+  _pastaPlanilhaHandle = await _atualizarStatusPasta(SYNC_DB_KEY, 'pastaPlanilhaStatus', 'btnInstalarSync', 'readwrite');
+}
+
+async function atualizarStatusPastaPrep() {
+  _pastaPreparoHandle = await _atualizarStatusPasta(SYNC_DB_KEY_PREP, 'pastaPreparoStatus', 'btnCarregarPrep', 'read');
+}
+
+async function _escolherPasta(dbKey, mode, onSuccess) {
+  if (!suportaFileSystemAccess()) { showToast('Use Chrome ou Edge para esta funcionalidade.'); return; }
+  try {
+    const handle = await window.showDirectoryPicker({ mode });
+    await _syncDbSalvarHandle(handle, dbKey);
+    showToast(`Pasta "${handle.name}" configurada.`);
+    onSuccess(handle);
+  } catch (e) {
+    if (e.name !== 'AbortError') showToast(`Erro ao escolher pasta: ${e.message}`);
   }
 }
 
 async function escolherPastaPlanilha() {
-  if (!suportaFileSystemAccess()) {
-    showToast('Esse navegador não suporta essa funcionalidade — use Chrome ou Edge.');
-    return;
-  }
+  await _escolherPasta(SYNC_DB_KEY, 'readwrite', h => { _pastaPlanilhaHandle = h; atualizarStatusPastaPlanilha(); });
+}
+
+async function escolherPastaPrep() {
+  await _escolherPasta(SYNC_DB_KEY_PREP, 'read', h => { _pastaPreparoHandle = h; atualizarStatusPastaPrep(); });
+}
+
+function _logPrepSync(msg) {
+  const el = document.getElementById('prepSyncLog');
+  if (el) el.insertAdjacentHTML('beforeend', `<div>${msg}</div>`);
+}
+
+async function carregarPrep() {
+  if (!_pastaPreparoHandle) return;
+  const log = document.getElementById('prepSyncLog');
+  if (log) log.innerHTML = '';
+  const btn = document.getElementById('btnCarregarPrep');
+  btn.disabled = true;
   try {
-    const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
-    await _syncDbSalvarHandle(handle);
-    _pastaPlanilhaHandle = handle;
-    showToast(`Pasta "${handle.name}" configurada.`);
-    atualizarStatusPastaPlanilha();
+    const perm = await _pastaPreparoHandle.requestPermission({ mode: 'read' });
+    if (perm !== 'granted') throw new Error('permissão de leitura negada');
+
+    const files = [];
+    for await (const [name, fh] of _pastaPreparoHandle.entries()) {
+      if (fh.kind === 'file' && name.endsWith('.xlsx') && !name.startsWith('~$')) {
+        files.push(await fh.getFile());
+      }
+    }
+    if (!files.length) throw new Error('Nenhum .xlsx encontrado na pasta configurada.');
+
+    const { camadas, avisos } = await processarArquivosPreparoBruto(files);
+    avisos.forEach(a => _logPrepSync(`⚠ ${escapeHtml(a)}`));
+    _logPrepSync(`${camadas.length} talhão(ões) lidos de ${files.length} arquivo(s).`);
+
+    const res = await fetch(`${RELEASE_PROXY_URL}/atualizar-preparo`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ camadas }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const r = await res.json();
+    _logPrepSync(`<span style="color:var(--green);font-weight:700">Preparo atualizado!</span> ${r.atualizados} talhão(ões).`);
+    if (r.mapeamentoCorrigido) _logPrepSync(`Mapeamento auto-corrigido p/ Sim: ${r.mapeamentoCorrigido}.`);
+    if (r.semCorrespondencia)  _logPrepSync(`⚠ ${r.semCorrespondencia} talhão(ões) sem correspondência na demanda.`);
+    showToast('Sist. Conser. atualizado!');
+    await carregarDadosSupabase();
+    populateMesFilter();
+    filterFazendas(document.getElementById('searchFaz')?.value || '');
+    updateStats();
+    if (document.getElementById('viewDashboard').style.display !== 'none') renderDashboard();
   } catch (e) {
-    if (e.name !== 'AbortError') showToast(`Erro ao escolher pasta: ${e.message}`);
+    _logPrepSync(`<span style="color:var(--red)">Erro: ${escapeHtml(e.message)}</span>`);
+    showToast(`Erro ao carregar Preparo: ${e.message}`);
+  } finally {
+    btn.disabled = false;
   }
 }
 
@@ -2758,6 +2825,7 @@ function toggleAdminPanel() {
   document.getElementById('adminOverlay').classList.add('open');
   renderAdminList();
   atualizarStatusPastaPlanilha();
+  atualizarStatusPastaPrep();
 }
 
 function closeAdminPanel() {
