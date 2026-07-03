@@ -1216,10 +1216,10 @@
     <!-- Atualizar Demanda -->
     <div>
       <div class="admin-panel-section-title">Atualizar Demanda</div>
-      <p class="admin-note" style="margin-bottom:12px">Reimporta a demanda completa. Preparo e Base de Fazendas são opcionais — se omitidos, Sist. Conser. fica em branco nos blocos novos.</p>
+      <p class="admin-note" style="margin-bottom:12px">Selecione os arquivos que mudaram. Com a Sequência → reimporta a demanda completa. Só o Preparo → atualiza o Sist. Conser. dos talhões existentes.</p>
       <div style="display:flex;flex-direction:column;gap:9px">
         <div>
-          <label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:4px">Sequência de Plantio</label>
+          <label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:4px">Sequência de Plantio (opcional)</label>
           <input type="file" id="inputSeqPlantio" accept=".xlsx" onchange="atualizarBotaoDemanda()">
         </div>
         <div>
@@ -1235,20 +1235,6 @@
         <button class="btn-submit" id="btnAtualizarDemanda" onclick="enviarAtualizacaoDemanda()" disabled>Atualizar →</button>
       </div>
       <div id="demandaLog" style="margin-top:10px;font-size:11px;line-height:1.7"></div>
-    </div>
-
-    <!-- Atualizar Preparo -->
-    <div>
-      <div class="admin-panel-section-title">Atualizar Preparo</div>
-      <p class="admin-note" style="margin-bottom:12px">Atualiza só o Sist. Conser. dos talhões existentes sem reimportar a demanda inteira.</p>
-      <div>
-        <label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:4px">Preparo (pode selecionar mais de um)</label>
-        <input type="file" id="inputPreparoBruto" accept=".xlsx" multiple onchange="atualizarBotaoPreparo()">
-      </div>
-      <div style="margin-top:12px">
-        <button class="btn-submit" id="btnAtualizarPreparo" onclick="enviarAtualizacaoPreparo()" disabled>Atualizar Preparo →</button>
-      </div>
-      <div id="prepLog" style="margin-top:10px;font-size:11px;line-height:1.7"></div>
     </div>
 
     <!-- Sincronizar Planilha -->
@@ -2284,11 +2270,9 @@ function dataParaIsoXlsx(v) {
 }
 
 function atualizarBotaoDemanda() {
-  document.getElementById('btnAtualizarDemanda').disabled = !document.getElementById('inputSeqPlantio').files[0];
-}
-
-function atualizarBotaoPreparo() {
-  document.getElementById('btnAtualizarPreparo').disabled = !document.getElementById('inputPreparoBruto').files.length;
+  const seq  = document.getElementById('inputSeqPlantio').files[0];
+  const prep = document.getElementById('inputPreparo').files.length;
+  document.getElementById('btnAtualizarDemanda').disabled = !(seq || prep);
 }
 
 function _logDemanda(msg) {
@@ -2422,49 +2406,66 @@ async function processarArquivosDemanda(fileSeq, filesPrep, fileBase) {
 }
 
 async function enviarAtualizacaoDemanda() {
-  const fileSeq    = document.getElementById('inputSeqPlantio').files[0];
-  const filesPrep  = [...document.getElementById('inputPreparo').files];
-  const fileBase   = document.getElementById('inputBaseFazendas').files[0] || null;
+  const fileSeq   = document.getElementById('inputSeqPlantio').files[0];
+  const filesPrep = [...document.getElementById('inputPreparo').files];
+  const fileBase  = document.getElementById('inputBaseFazendas').files[0] || null;
   const btn = document.getElementById('btnAtualizarDemanda');
   const log = document.getElementById('demandaLog');
   if (log) log.innerHTML = '';
-  if (!fileSeq) return;
+  if (!fileSeq && !filesPrep.length) return;
 
   btn.disabled = true;
   try {
-    _logDemanda('Lendo planilhas...');
-    const { talhoes, resumo } = await processarArquivosDemanda(fileSeq, filesPrep, fileBase);
-    _logDemanda(`${resumo.nLinhas} bloco(s) de demanda, ${resumo.nExplodidos} talhão(ões) explodido(s).`);
-    if (resumo.nAdmin)       _logDemanda(`Filtro administrativo (COD FAZ ${CODFAZ_EXCLUIR_PREFIXO}x): ${resumo.nAdmin} linha(s) excluída(s).`);
-    if (resumo.nIgnoradas)   _logDemanda(`${resumo.nIgnoradas} linha(s) parcial(is) ignorada(s) (faltava Código/Seção/Talhões).`);
-    if (resumo.nFalhaTalhao) _logDemanda(`${resumo.nFalhaTalhao} linha(s) com TALHÕES não interpretável.`);
-    resumo.avisos.forEach(a => _logDemanda(`<span style="color:var(--accent)">⚠ ${escapeHtml(a)}</span>`));
-
-    if (!talhoes.length) {
-      _logDemanda('<span style="color:var(--red)">Nenhum talhão pra enviar — confira as planilhas selecionadas.</span>');
-      return;
+    // Só Preparo selecionado → atualiza apenas sist_conser dos talhões existentes.
+    if (!fileSeq && filesPrep.length) {
+      _logDemanda('Lendo arquivos de Preparo...');
+      const { camadas, avisos } = await processarArquivosPreparoBruto(filesPrep);
+      avisos.forEach(a => _logDemanda(`⚠ ${escapeHtml(a)}`));
+      _logDemanda(`${camadas.length} talhão(ões) com Sist. Conser. lidos.`);
+      _logDemanda('Enviando pro servidor...');
+      const res = await fetch(`${RELEASE_PROXY_URL}/atualizar-preparo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ camadas }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const r = await res.json();
+      _logDemanda(`<span style="color:var(--green);font-weight:700">Preparo atualizado!</span> ${r.atualizados} talhão(ões) atualizados.`);
+      if (r.mapeamentoCorrigido) _logDemanda(`Mapeamento auto-corrigido p/ Sim: ${r.mapeamentoCorrigido}.`);
+      if (r.semCorrespondencia)  _logDemanda(`⚠ ${r.semCorrespondencia} talhão(ões) não encontrados na demanda atual.`);
+      showToast('Sist. Conser. atualizado!');
+    } else {
+      // Sequência presente → importação completa (+ Preparo e Base de Fazendas se houver).
+      _logDemanda('Lendo planilhas...');
+      const { talhoes, resumo } = await processarArquivosDemanda(fileSeq, filesPrep, fileBase);
+      _logDemanda(`${resumo.nLinhas} bloco(s) de demanda, ${resumo.nExplodidos} talhão(ões) explodido(s).`);
+      if (resumo.nAdmin)       _logDemanda(`Filtro administrativo (COD FAZ ${CODFAZ_EXCLUIR_PREFIXO}x): ${resumo.nAdmin} linha(s) excluída(s).`);
+      if (resumo.nIgnoradas)   _logDemanda(`${resumo.nIgnoradas} linha(s) parcial(is) ignorada(s) (faltava Código/Seção/Talhões).`);
+      if (resumo.nFalhaTalhao) _logDemanda(`${resumo.nFalhaTalhao} linha(s) com TALHÕES não interpretável.`);
+      resumo.avisos.forEach(a => _logDemanda(`<span style="color:var(--accent)">⚠ ${escapeHtml(a)}</span>`));
+      if (!talhoes.length) {
+        _logDemanda('<span style="color:var(--red)">Nenhum talhão pra enviar — confira as planilhas selecionadas.</span>');
+        return;
+      }
+      _logDemanda(`Enviando ${talhoes.length} registro(s) pro servidor...`);
+      const res = await fetch(`${RELEASE_PROXY_URL}/importar-demanda`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ talhoes }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const r = await res.json();
+      _logDemanda(`<span style="color:var(--green);font-weight:700">Demanda atualizada!</span> ${r.totalEnviado} registro(s) (novos: ${r.novos}, preservados: ${r.preservados}).`);
+      if (r.corrigidos)          _logDemanda(`Status corrigido (Pendente ⇄ Aguard. Map.): ${r.corrigidos}.`);
+      if (r.mapeamentoCorrigido) _logDemanda(`Mapeamento auto-corrigido p/ Sim: ${r.mapeamentoCorrigido}.`);
+      if (r.semArea)             _logDemanda(`⚠ ${r.semArea} talhão(ões) sem área.`);
+      if (r.semSistConser)       _logDemanda(`⚠ ${r.semSistConser} talhão(ões) sem Sist. Conser.`);
+      if (r.removidos && r.removidos.length) {
+        _logDemanda(`<span style="color:var(--accent)">⚠ ${r.removidos.length} LAYER(s) preenchidos sumiram da nova base.</span>`);
+      }
+      showToast('Demanda atualizada com sucesso.');
     }
 
-    _logDemanda(`Enviando ${talhoes.length} registro(s) pro servidor...`);
-    const res = await fetch(`${RELEASE_PROXY_URL}/importar-demanda`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ talhoes }),
-    });
-    if (!res.ok) throw new Error(await res.text());
-    const r = await res.json();
-
-    _logDemanda('<span style="color:var(--green);font-weight:700">Atualização concluída!</span>');
-    _logDemanda(`Registros enviados: ${r.totalEnviado} (novos: ${r.novos}, preservados: ${r.preservados})`);
-    _logDemanda(`Status corrigido (Pendente ⇄ Aguard. Map.): ${r.corrigidos}. Mapeamento auto-corrigido p/ Sim: ${r.mapeamentoCorrigido}.`);
-    if (r.semArea)       _logDemanda(`⚠ ${r.semArea} talhão(ões) sem área (area_ha = 0).`);
-    if (r.semSistConser) _logDemanda(`⚠ ${r.semSistConser} talhão(ões) ainda sem Sist. Conser.`);
-    if (r.removidos && r.removidos.length) {
-      _logDemanda(`<span style="color:var(--accent)">⚠ ${r.removidos.length} LAYER(s) preenchidos não estão na nova base (dado continua salvo, só não recebe mais atualização):</span>`);
-      r.removidos.slice(0, 10).forEach(rm => _logDemanda(`&nbsp;&nbsp;LAYER ${rm.layer}: mapeamento=${escapeHtml(rm.mapeamento)} | projeto=${escapeHtml(rm.projeto)}`));
-    }
-
-    showToast('Demanda atualizada com sucesso.');
     await carregarDadosSupabase();
     populateMesFilter();
     filterFazendas(document.getElementById('searchFaz')?.value || '');
