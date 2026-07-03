@@ -804,6 +804,7 @@
   .faz-tag-blue   { background: rgba(90,159,212,.15);  color: var(--blue);   }
   .faz-tag-cyan   { background: rgba(79,195,217,.15);  color: var(--cyan);   }
   .faz-tag-orange { background: rgba(224,129,60,.15);  color: var(--orange); }
+  .faz-tag-yellow { background: rgba(224,194,60,.15);  color: var(--yellow); }
   .faz-tag-muted  { background: rgba(122,136,117,.15); color: var(--muted);  }
 
   /* ── Dashboard ── */
@@ -1575,10 +1576,11 @@ function precisaMapeamento(sistConser) {
   return SIST_CONSER_PRECISA_MAPEAMENTO.has(sistConser);
 }
 
-// Tag (cor) usada para exibir o Sist. Conser.: Base larga = ciano, Embutido = laranja.
+// Tag (cor) usada para exibir o Sist. Conser.: Base larga = ciano, Embutido = laranja, Livre = amarelo.
 function sistConserTagCls(sistConser) {
   if (!sistConser) return 'muted';
   if (sistConser === 'Embutido') return 'orange';
+  if (sistConser === 'Livre') return 'yellow';
   return 'cyan';
 }
 
