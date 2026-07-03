@@ -3298,10 +3298,9 @@ function renderConsulta(page) {
     ? FAZENDA_NAMES.filter(n => n.toLowerCase().includes(q) || String(FAZENDAS[n].cod).includes(q))
     : FAZENDA_NAMES;
 
-  if (filtMes) names = names.filter(n =>
-    Object.values(FAZENDAS[n].talhoes).some(t => talYM(t) === filtMes));
-  if (filtSc) names = names.filter(n =>
-    Object.values(FAZENDAS[n].talhoes).some(matchSc));
+  if (filtMes || filtSc) names = names.filter(n =>
+    Object.values(FAZENDAS[n].talhoes).some(t =>
+      (!filtMes || talYM(t) === filtMes) && matchSc(t)));
   if (filtStatus) names = names.filter(n => getFazStatus(n).status === filtStatus);
 
   _consultaNames = names;
