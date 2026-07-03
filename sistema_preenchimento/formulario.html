@@ -3759,8 +3759,8 @@ function renderNotifPanel() {
         <small>COD ${n.cod ?? '—'} · ${tempo}</small>
       </div>
       <div class="notif-actions">
-        <button class="btn-outline" style="padding:2px 10px;font-size:11px" onclick="selectFazenda(${JSON.stringify(n.fazenda)});toggleNotifPanel()">Ir</button>
-        <button class="btn-outline" style="padding:2px 8px;font-size:11px" onclick="dispensarNotif(${JSON.stringify(n.id)})">×</button>
+        <button class="btn-outline" style="padding:2px 10px;font-size:11px" data-faz="${escapeHtml(n.fazenda)}" onclick="selectFazenda(this.dataset.faz);toggleNotifPanel()">Ir</button>
+        <button class="btn-outline" style="padding:2px 8px;font-size:11px" data-id="${escapeHtml(n.id)}" onclick="dispensarNotif(this.dataset.id)">×</button>
       </div>
     </li>`;
   }).join('');
