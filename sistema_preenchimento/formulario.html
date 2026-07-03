@@ -1561,7 +1561,8 @@ const _anoAtual = _hoje.getFullYear(), _mesAtual = _hoje.getMonth();
 function normalizaSistConser(raw) {
   if (!raw) return '';
   const s = String(raw).normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toUpperCase();
-  if (s === '' || s === '-' || s === 'SEM DADOS' || s === 'SEM DADO') return '';
+  if (s === '' || s === 'SEM DADOS' || s === 'SEM DADO') return '';
+  if (s === '-') return 'Livre';
   if (s === 'BASE LARGA') return 'Base larga';
   if (s === 'EMBUTIDO' || s === 'INTERCALADA' || s === 'INTERCALADO') return 'Embutido';
   return s;

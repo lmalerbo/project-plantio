@@ -115,9 +115,10 @@ def data_para_iso(v):
 # ── Normalização de Sist. Conser. (nomenclatura bagunçada da planilha) ────
 # A coluna SISTEMA DE CONSERVAÇÃO da planilha de Preparo chega com grafias
 # inconsistentes — normaliza pra um rótulo canônico único por situação:
-#   '-', 'SEM DADOS' (e variações de acento/maiúscula) → ''  (vazio)
-#   'BASE LARGA'                                        → 'Base larga'
-#   'EMBUTIDO' / 'INTERCALADA' / 'INTERCALADO'           → 'Embutido'
+#   'SEM DADOS' (e variações de acento/maiúscula) → ''       (vazio — dado ausente)
+#   '-'                                            → 'Livre'  (sem sistema de conservação)
+#   'BASE LARGA'                                   → 'Base larga'
+#   'EMBUTIDO' / 'INTERCALADA' / 'INTERCALADO'     → 'Embutido'
 # Mantenha esta função em sincronia com normalizaSistConser() no formulario.html
 # — não há como compartilhar código entre JS e Python aqui.
 
@@ -125,8 +126,10 @@ def normaliza_sist_conser(v):
     if v is None:
         return ''
     s = norm_header(v)
-    if s in ('', '-', 'SEM DADOS', 'SEM DADO'):
+    if s in ('', 'SEM DADOS', 'SEM DADO'):
         return ''
+    if s == '-':
+        return 'Livre'
     if s == 'BASE LARGA':
         return 'Base larga'
     if s in ('EMBUTIDO', 'INTERCALADA', 'INTERCALADO'):
