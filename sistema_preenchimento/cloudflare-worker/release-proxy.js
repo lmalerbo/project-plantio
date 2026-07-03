@@ -1,5 +1,5 @@
-// Proxy para upload de arquivos de projeto (.dwg/.zip/.pdf) nas Releases do GitHub
-// e para a importação de demanda (Sequência de Plantio + Preparo) no Supabase.
+// Proxy para upload de arquivos de projeto (.dwg/.zip/.pdf) nas Releases do GitHub,
+// importação de demanda (Sequência de Plantio) e atualização de Preparo (Sist. Conser.).
 //
 // Motivo do upload: o formulario.html é estático e público (GitHub Pages) — qualquer
 // token do GitHub embutido nele é detectado e revogado automaticamente pelo secret
@@ -198,6 +198,46 @@ async function importarDemanda(env, talhoes) {
   };
 }
 
+// Atualiza APENAS sist_conser dos talhões já existentes na programação,
+// sem reimportar a demanda inteira. Preserva todos os outros campos.
+async function atualizarPreparo(env, camadas) {
+  const updateMap = new Map(camadas.map(c => [Number(c.layer), String(c.sist_conser ?? '').trim()]));
+
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/programacao?select=*`, { headers: sbHeaders(env) });
+  if (!res.ok) throw new Error(`leitura programacao: ${res.status} ${await res.text()}`);
+  const rows = await res.json();
+
+  const toUpsert = [];
+  let mapeamentoCorrigido = 0;
+  for (const row of rows) {
+    const layer = Number(row.layer);
+    if (!updateMap.has(layer)) continue;
+    const newSc = updateMap.get(layer);
+    if (newSc === (row.sist_conser || '')) continue;
+    const updated = { ...row, sist_conser: newSc };
+    if (!SIST_CONSER_PRECISA_MAPEAMENTO.has(newSc) && row.mapeamento !== 'Sim') {
+      updated.mapeamento = 'Sim';
+      mapeamentoCorrigido++;
+    }
+    toUpsert.push(updated);
+  }
+
+  const BATCH = 500;
+  for (let i = 0; i < toUpsert.length; i += BATCH) {
+    const chunk = toUpsert.slice(i, i + BATCH);
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/programacao`, {
+      method: 'POST',
+      headers: sbHeaders(env, { 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify(chunk),
+    });
+    if (!r.ok) throw new Error(`upsert preparo lote ${i}: ${r.status} ${await r.text()}`);
+  }
+
+  const layersExistentes = new Set(rows.map(r => Number(r.layer)));
+  const semCorrespondencia = [...updateMap.keys()].filter(l => !layersExistentes.has(l)).length;
+  return { atualizados: toUpsert.length, semCorrespondencia, mapeamentoCorrigido };
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') {
@@ -239,6 +279,15 @@ export default {
           return new Response('talhoes (array não vazio) é obrigatório', { status: 400, headers: corsHeaders() });
         }
         const resumo = await importarDemanda(env, body.talhoes);
+        return new Response(JSON.stringify(resumo), { headers: { ...corsHeaders(), 'Content-Type': 'application/json' } });
+      }
+
+      if (url.pathname === '/atualizar-preparo' && request.method === 'POST') {
+        const body = await request.json();
+        if (!Array.isArray(body.camadas) || !body.camadas.length) {
+          return new Response('camadas (array não vazio) é obrigatório', { status: 400, headers: corsHeaders() });
+        }
+        const resumo = await atualizarPreparo(env, body.camadas);
         return new Response(JSON.stringify(resumo), { headers: { ...corsHeaders(), 'Content-Type': 'application/json' } });
       }
 

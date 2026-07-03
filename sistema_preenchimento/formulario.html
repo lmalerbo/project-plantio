@@ -1216,15 +1216,14 @@
     <!-- Atualizar Demanda -->
     <div>
       <div class="admin-panel-section-title">Atualizar Demanda</div>
-      <p class="admin-note" style="margin-bottom:12px">Seleciona a Sequência de Plantio e o(s) arquivo(s) de Preparo
-        (Base de Fazendas opcional). Substitui o antigo ATUALIZAR.bat.</p>
+      <p class="admin-note" style="margin-bottom:12px">Reimporta a demanda completa. Preparo e Base de Fazendas são opcionais — se omitidos, Sist. Conser. fica em branco nos blocos novos.</p>
       <div style="display:flex;flex-direction:column;gap:9px">
         <div>
           <label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:4px">Sequência de Plantio</label>
           <input type="file" id="inputSeqPlantio" accept=".xlsx" onchange="atualizarBotaoDemanda()">
         </div>
         <div>
-          <label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:4px">Preparo (pode selecionar mais de um)</label>
+          <label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:4px">Preparo (opcional, pode selecionar mais de um)</label>
           <input type="file" id="inputPreparo" accept=".xlsx" multiple onchange="atualizarBotaoDemanda()">
         </div>
         <div>
@@ -1236,6 +1235,20 @@
         <button class="btn-submit" id="btnAtualizarDemanda" onclick="enviarAtualizacaoDemanda()" disabled>Atualizar →</button>
       </div>
       <div id="demandaLog" style="margin-top:10px;font-size:11px;line-height:1.7"></div>
+    </div>
+
+    <!-- Atualizar Preparo -->
+    <div>
+      <div class="admin-panel-section-title">Atualizar Preparo</div>
+      <p class="admin-note" style="margin-bottom:12px">Atualiza só o Sist. Conser. dos talhões existentes sem reimportar a demanda inteira.</p>
+      <div>
+        <label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:4px">Preparo (pode selecionar mais de um)</label>
+        <input type="file" id="inputPreparoBruto" accept=".xlsx" multiple onchange="atualizarBotaoPreparo()">
+      </div>
+      <div style="margin-top:12px">
+        <button class="btn-submit" id="btnAtualizarPreparo" onclick="enviarAtualizacaoPreparo()" disabled>Atualizar Preparo →</button>
+      </div>
+      <div id="prepLog" style="margin-top:10px;font-size:11px;line-height:1.7"></div>
     </div>
 
     <!-- Sincronizar Planilha -->
@@ -1853,11 +1866,10 @@ function setMapeamento(val) {
   updateSalvarBtn();
 }
 
-// Embutido exige Mapeamento=Sim antes do Projeto avançar; sem Sist. Conser.
-// ainda registrado na base de preparo, também não dá pra avançar (situação ainda incerta).
-// Retorna o motivo do bloqueio ('aguardando_mapeamento' | 'sem_dado' | null = liberado).
+// Retorna o motivo do bloqueio ('aguardando_mapeamento' | null = liberado).
+// Sist. Conser. vazio (SEM DADO) não bloqueia — o usuário pode avançar o projeto
+// mesmo sem essa informação; o badge "SEM DADO" no card já comunica a ausência.
 function motivoBloqueioProjeto(sistConser, mapeamento) {
-  if (!sistConser) return 'sem_dado';
   if (precisaMapeamento(sistConser) && mapeamento !== 'Sim') return 'aguardando_mapeamento';
   return null;
 }
@@ -1870,22 +1882,17 @@ function aplicarGatingProjeto(sistConser) {
   if (motivo === 'aguardando_mapeamento') {
     [...sel.options].forEach(opt => { opt.disabled = opt.value !== 'Aguard. Map.'; });
     if (sel.value !== 'Aguard. Map.') sel.value = 'Aguard. Map.';
-  } else if (motivo === 'sem_dado') {
-    [...sel.options].forEach(opt => { opt.disabled = opt.value !== 'Pendente'; });
-    if (sel.value !== 'Pendente') sel.value = 'Pendente';
   } else {
     [...sel.options].forEach(opt => { opt.disabled = opt.value === 'Aguard. Map.'; });
     if (sel.value === 'Aguard. Map.') sel.value = 'Pendente';
   }
 
   const info = document.getElementById('gatingInfo');
-  if (!motivo) {
-    info.style.display = 'none';
-  } else {
+  if (motivo) {
     info.style.display = '';
-    info.textContent = motivo === 'aguardando_mapeamento'
-      ? '⚠ Sist. Conser. exige Mapeamento = Sim antes do Projeto poder avançar.'
-      : '⚠ Ainda sem Sist. Conser. da base de preparo — Projeto fica em Pendente até essa informação chegar.';
+    info.textContent = '⚠ Sist. Conser. exige Mapeamento = Sim antes do Projeto poder avançar.';
+  } else {
+    info.style.display = 'none';
   }
 }
 
@@ -2277,9 +2284,11 @@ function dataParaIsoXlsx(v) {
 }
 
 function atualizarBotaoDemanda() {
-  const seq  = document.getElementById('inputSeqPlantio').files[0];
-  const prep = document.getElementById('inputPreparo').files;
-  document.getElementById('btnAtualizarDemanda').disabled = !(seq && prep && prep.length);
+  document.getElementById('btnAtualizarDemanda').disabled = !document.getElementById('inputSeqPlantio').files[0];
+}
+
+function atualizarBotaoPreparo() {
+  document.getElementById('btnAtualizarPreparo').disabled = !document.getElementById('inputPreparoBruto').files.length;
 }
 
 function _logDemanda(msg) {
@@ -2419,7 +2428,7 @@ async function enviarAtualizacaoDemanda() {
   const btn = document.getElementById('btnAtualizarDemanda');
   const log = document.getElementById('demandaLog');
   if (log) log.innerHTML = '';
-  if (!fileSeq || !filesPrep.length) return;
+  if (!fileSeq) return;
 
   btn.disabled = true;
   try {
@@ -2464,6 +2473,80 @@ async function enviarAtualizacaoDemanda() {
   } catch (e) {
     _logDemanda(`<span style="color:var(--red)">Erro: ${escapeHtml(e.message)}</span>`);
     showToast(`Erro ao atualizar demanda: ${e.message}`);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Atualizar Preparo (só sist_conser, sem reimportar a demanda) ──────────
+function _logPreparo(msg) {
+  const el = document.getElementById('prepLog');
+  if (el) el.insertAdjacentHTML('beforeend', `<div>${msg}</div>`);
+}
+
+async function processarArquivosPreparoBruto(filesPrep) {
+  const camadas = [];
+  const avisos = [];
+  for (const fp of filesPrep) {
+    const wb = await lerWorkbookXlsx(fp);
+    const sheetName = wb.SheetNames.find(n => normHeaderXlsx(n) === 'CONSERVACAO');
+    if (!sheetName) { avisos.push(`Aba 'CONSERVAÇÃO' não encontrada em ${fp.name} — ignorada.`); continue; }
+    const sheet = wb.Sheets[sheetName];
+    const { headerRowIdx, hmap } = acharHeaderXlsx(sheet, ['SECAO', 'TALHAO', 'SISTEMA DE CONSERVACAO']);
+    if (headerRowIdx === -1) { avisos.push(`Cabeçalho (Seção/Talhão/Sistema de Conservação) não encontrado em ${fp.name} — ignorada.`); continue; }
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: true });
+    const idxCod = hmap['SECAO'], idxTal = hmap['TALHAO'], idxSc = hmap['SISTEMA DE CONSERVACAO'];
+    for (let i = headerRowIdx + 1; i < rows.length; i++) {
+      const row = rows[i] || [];
+      const codRaw = row[idxCod], talRaw = row[idxTal], scRaw = row[idxSc];
+      if (codRaw == null || talRaw == null) continue;
+      const codFaz = parseInt(codRaw, 10);
+      if (isNaN(codFaz) || String(codFaz).startsWith(CODFAZ_EXCLUIR_PREFIXO)) continue;
+      const talhao = parseInt(talRaw, 10);
+      if (isNaN(talhao)) continue;
+      const layer = Number(`${codFaz}${String(talhao).padStart(3, '0')}`);
+      camadas.push({ layer, sist_conser: normalizaSistConser(scRaw) });
+    }
+  }
+  // Dedupe por layer (último ganha).
+  const porLayer = new Map();
+  for (const c of camadas) porLayer.set(c.layer, c.sist_conser);
+  return {
+    camadas: [...porLayer.entries()].map(([layer, sist_conser]) => ({ layer, sist_conser })),
+    avisos,
+  };
+}
+
+async function enviarAtualizacaoPreparo() {
+  const filesPrep = [...document.getElementById('inputPreparoBruto').files];
+  const btn = document.getElementById('btnAtualizarPreparo');
+  const log = document.getElementById('prepLog');
+  if (log) log.innerHTML = '';
+  if (!filesPrep.length) return;
+
+  btn.disabled = true;
+  try {
+    _logPreparo('Lendo arquivos de Preparo...');
+    const { camadas, avisos } = await processarArquivosPreparoBruto(filesPrep);
+    avisos.forEach(a => _logPreparo(`⚠ ${escapeHtml(a)}`));
+    _logPreparo(`${camadas.length} talhão(ões) com Sist. Conser. lidos.`);
+
+    _logPreparo('Enviando pro servidor...');
+    const res = await fetch(`${RELEASE_PROXY_URL}/atualizar-preparo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ camadas }),
+    });
+    if (!res.ok) { const t = await res.text(); throw new Error(`${res.status}: ${t}`); }
+    const r = await res.json();
+    _logPreparo('<span style="color:var(--green);font-weight:700">Preparo atualizado!</span>');
+    _logPreparo(`Talhões atualizados: ${r.atualizados}. Sem correspondência na demanda: ${r.semCorrespondencia}.`);
+    if (r.mapeamentoCorrigido) _logPreparo(`Mapeamento auto-corrigido p/ Sim: ${r.mapeamentoCorrigido}.`);
+    showToast('Sist. Conser. atualizado!');
+    await carregarDadosSupabase();
+  } catch (e) {
+    _logPreparo(`<span style="color:var(--red)">Erro: ${escapeHtml(e.message)}</span>`);
+    showToast(`Erro ao atualizar preparo: ${e.message}`);
   } finally {
     btn.disabled = false;
   }
