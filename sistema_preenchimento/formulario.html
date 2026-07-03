@@ -924,6 +924,20 @@
     display: flex; align-items: center; gap: 8px;
   }
   .admin-panel-section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .admin-label {
+    font-size: 10px; font-weight: 700; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .8px;
+    display: block; margin-bottom: 4px;
+  }
+  .btn-outline {
+    background: transparent; border: 1.5px solid var(--border);
+    color: var(--text); border-radius: var(--radius);
+    padding: 8px 16px; font-family: inherit;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: border-color .2s, color .2s;
+  }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-outline:disabled { opacity: .35; cursor: default; }
 </style>
 </head>
 <body>
@@ -1201,13 +1215,13 @@
       <div class="admin-panel-section-title">Usuários</div>
       <div id="adminUserList" style="max-height:240px;overflow-y:auto"></div>
       <div class="admin-section">
-        <label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px">Novo usuário</label>
+        <label class="admin-label">Novo usuário</label>
         <div style="display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap">
           <input type="text" id="inputAdminUser" placeholder="Nome" style="flex:1;min-width:100px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:7px 9px;color:var(--text);font-family:inherit;font-size:12px">
           <label class="admin-perfil-check"><input type="checkbox" id="chkPreenchimento" checked> Preencher</label>
           <label class="admin-perfil-check"><input type="checkbox" id="chkDashboard" checked> Dashboard</label>
           <label class="admin-perfil-check"><input type="checkbox" id="chkAdmin"> Admin</label>
-          <button class="btn-modal-ok" onclick="adminAddUser()" style="padding:7px 12px;white-space:nowrap">+</button>
+          <button class="btn-submit" onclick="adminAddUser()" style="padding:7px 14px;white-space:nowrap">+</button>
         </div>
       </div>
       <p class="admin-note">Mudanças são salvas direto no Supabase e já valem pra todo mundo.</p>
@@ -1219,15 +1233,15 @@
       <p class="admin-note" style="margin-bottom:12px">Selecione os arquivos que mudaram. Com a Sequência → reimporta a demanda completa. Só o Preparo → atualiza o Sist. Conser. dos talhões existentes.</p>
       <div style="display:flex;flex-direction:column;gap:9px">
         <div>
-          <label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:4px">Sequência de Plantio (opcional)</label>
+          <label class="admin-label">Sequência de Plantio (opcional)</label>
           <input type="file" id="inputSeqPlantio" accept=".xlsx" onchange="atualizarBotaoDemanda()">
         </div>
         <div>
-          <label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:4px">Preparo (opcional, pode selecionar mais de um)</label>
+          <label class="admin-label">Preparo (opcional, pode selecionar mais de um)</label>
           <input type="file" id="inputPreparo" accept=".xlsx" multiple onchange="atualizarBotaoDemanda()">
         </div>
         <div>
-          <label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:4px">Base de Fazendas (opcional)</label>
+          <label class="admin-label">Base de Fazendas (opcional)</label>
           <input type="file" id="inputBaseFazendas" accept=".xlsx,.xls">
         </div>
       </div>
@@ -1244,8 +1258,8 @@
         Depois é só dar duplo clique no <strong>SINCRONIZAR_PLANILHA.bat</strong> quando quiser atualizar o status.</p>
       <div style="font-size:11px;color:var(--muted);margin-bottom:8px" id="pastaPlanilhaStatus">Nenhuma pasta configurada.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn-modal-cancel" onclick="escolherPastaPlanilha()">📁 Escolher pasta</button>
-        <button class="btn-modal-ok" id="btnInstalarSync" onclick="instalarArquivosSync()" disabled>Instalar/atualizar</button>
+        <button class="btn-outline" onclick="escolherPastaPlanilha()">Escolher pasta</button>
+        <button class="btn-submit" id="btnInstalarSync" onclick="instalarArquivosSync()" disabled>Instalar/atualizar</button>
       </div>
       <div id="syncLog" style="margin-top:10px;font-size:11px;line-height:1.7"></div>
     </div>
