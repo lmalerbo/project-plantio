@@ -28,6 +28,7 @@ openpyxl, só leitura — o Excel real (xlwings) é usado só para escrever as 3
 células e salvar, minimizando o que passa pelo motor de salvamento do Excel.
 """
 
+import datetime
 import os
 import sys
 
@@ -208,6 +209,7 @@ try:
         ws.range((linha, COL_Z)).value  = sist_conser
         ws.range((linha, COL_AA)).value = mapeamento
         ws.range((linha, COL_AB)).value = projeto
+    ws.range((3, COL_AA)).value = f"Atualizado em: {datetime.date.today().strftime('%d/%m/%Y')}"
     wb.save(_tmp_path)
 finally:
     wb.close()
