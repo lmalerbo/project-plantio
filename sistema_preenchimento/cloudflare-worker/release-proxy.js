@@ -119,6 +119,7 @@ async function importarDemanda(env, talhoes) {
       ciclo: String(t.ciclo ?? '').trim(),
       ambiente: String(t.ambiente ?? '').trim(),
       sist_conser: String(t.sist_conser ?? '').trim(),
+      seq_plantio: String(t.seq_plantio ?? '').trim(),
       bloco_id: String(t.bloco_id ?? ''),
     });
   }

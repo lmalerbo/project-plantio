@@ -805,6 +805,7 @@
   .faz-tag-cyan   { background: rgba(79,195,217,.15);  color: var(--cyan);   }
   .faz-tag-orange { background: rgba(224,129,60,.15);  color: var(--orange); }
   .faz-tag-yellow { background: rgba(224,194,60,.15);  color: var(--yellow); }
+  .faz-tag-red    { background: rgba(217,92,92,.15);   color: var(--red);    }
   .faz-tag-muted  { background: rgba(122,136,117,.15); color: var(--muted);  }
 
   /* ── Dashboard ── */
@@ -1453,12 +1454,17 @@ async function carregarDadosSupabase() {
         mapeamento: row.mapeamento || 'Não',
         projeto: row.projeto || 'Pendente',
         blocoId: row.bloco_id || '',
+        seqPlantio: row.seq_plantio || '',
       };
       layerHa[String(row.layer)] = row.area_ha || 0;
     }
 
     FAZENDA_NAMES.length = 0;
     Object.keys(FAZENDAS).sort().forEach(n => FAZENDA_NAMES.push(n));
+    for (const faz of Object.keys(FAZENDAS)) {
+      FAZENDAS[faz].experimento = Object.values(FAZENDAS[faz].talhoes)
+        .some(t => /experimento/i.test(t.seqPlantio));
+    }
 
     // Usuários de teste/diagnóstico (ex: "teste-diagnostico") não entram no
     // gráfico "Ha por Usuário" — são execuções de validação, não trabalho real.
@@ -1673,6 +1679,7 @@ function renderFazendas(names) {
             <div class="fazenda-meta" style="display:flex;gap:4px;margin-top:3px;flex-wrap:wrap">
               <span class="faz-tag faz-tag-${cls}">${escapeHtml(status)}</span>
               <span class="faz-tag faz-tag-muted">${escapeHtml(ciclo)}</span>
+              ${d.experimento ? `<span class="faz-tag faz-tag-red">EXPERIMENTO</span>` : ''}
               ${nMes > 0 ? `<span style="font-size:9px;color:var(--green);font-weight:700">● mês</span>` : ''}
             </div>
           </div>
@@ -2414,7 +2421,8 @@ async function processarArquivosDemanda(fileSeq, filesPrep, fileBase) {
 
   const rowsSeq = XLSX.utils.sheet_to_json(sheetSeq, { header: 1, defval: null, raw: true });
   const idxMes = hmapSeq['MES DE PLANTIO'], idxCic = hmapSeq['CICLO'], idxCod = hmapSeq['CODIGO'],
-        idxSec = hmapSeq['SECAO'], idxTal = hmapSeq['TALHOES'], idxAmb = hmapSeq['AMBIENTE'];
+        idxSec = hmapSeq['SECAO'], idxTal = hmapSeq['TALHOES'], idxAmb = hmapSeq['AMBIENTE'],
+        idxSeqP = hmapSeq['SEQUENCIA PLANTIO'];
 
   const exploded = [];
   let nLinhas = 0, nAdmin = 0, nIgnoradas = 0, nFalhaTalhao = 0;
@@ -2442,10 +2450,11 @@ async function processarArquivosDemanda(fileSeq, filesPrep, fileBase) {
     const mesPlantio = idxMes != null ? dataParaIsoXlsx(row[idxMes]) : null;
     const ciclo = (idxCic != null && row[idxCic] != null) ? String(row[idxCic]).trim() : '';
     const ambiente = (idxAmb != null && row[idxAmb]) ? String(row[idxAmb]).trim() : '';
+    const seqPlantio = (idxSeqP != null && row[idxSeqP]) ? String(row[idxSeqP]).trim() : '';
     const blocoId = `${Math.trunc(codFaz)}|${mesPlantio}|${String(talRaw).trim()}`;
 
     for (const talhao of talhoes) {
-      exploded.push({ cod_faz: Math.trunc(codFaz), fazenda, talhao, mes_plantio: mesPlantio, ciclo, ambiente, bloco_id: blocoId });
+      exploded.push({ cod_faz: Math.trunc(codFaz), fazenda, talhao, mes_plantio: mesPlantio, ciclo, ambiente, seq_plantio: seqPlantio, bloco_id: blocoId });
     }
   }
 
@@ -2464,7 +2473,7 @@ async function processarArquivosDemanda(fileSeq, filesPrep, fileBase) {
     porLayer.set(layer, {
       layer, periodo_op: periodoOp, cod_faz: r.cod_faz, fazenda: r.fazenda, talhao: r.talhao,
       area_ha: areaHa, mes_plantio: r.mes_plantio, ciclo: r.ciclo, ambiente: r.ambiente,
-      sist_conser: sistConser, bloco_id: r.bloco_id,
+      sist_conser: sistConser, seq_plantio: r.seq_plantio || '', bloco_id: r.bloco_id,
     });
   }
 
@@ -3332,7 +3341,7 @@ function renderConsulta(page) {
       : '';
     return `<tr class="consulta-faz-row${_consultaSelected.has(name) ? ' selected' : ''}" onclick="toggleFazDetail('${escName}',this,'${filtMes}','${filtSc}')" oncontextmenu="openCtxMenu(event,'${escName}')" id="cfr-${CSS.escape(name)}">
       ${cbTd}
-      <td><span class="consulta-expand-icon" id="cfi-${CSS.escape(name)}">▶</span><strong>${escapeHtml(name)}</strong></td>
+      <td><span class="consulta-expand-icon" id="cfi-${CSS.escape(name)}">▶</span><strong>${escapeHtml(name)}</strong>${FAZENDAS[name]?.experimento ? ' <span class="faz-tag faz-tag-red" style="font-size:10px;margin-left:6px">EXPERIMENTO</span>' : ''}</td>
       <td style="font-family:monospace">${d.cod}</td>
       <td><span class="faz-tag faz-tag-muted">${escapeHtml(ciclo)}</span></td>
       <td><span class="faz-tag faz-tag-${cls}">${escapeHtml(status)}</span></td>
