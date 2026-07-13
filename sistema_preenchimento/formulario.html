@@ -1461,6 +1461,7 @@ async function carregarDadosSupabase() {
 
     FAZENDA_NAMES.length = 0;
     Object.keys(FAZENDAS).sort().forEach(n => FAZENDA_NAMES.push(n));
+    _blocoUltimoSalvo = {};
     for (const faz of Object.keys(FAZENDAS)) {
       FAZENDAS[faz].experimento = Object.values(FAZENDAS[faz].talhoes)
         .some(t => /experimento/i.test(t.seqPlantio));
@@ -1847,15 +1848,18 @@ function getBlocos(name) {
     grupos.get(key).push({ tal: +tal, ...td });
   });
   return [...grupos.entries()].map(([blocoId, tals]) => {
+    tals.sort((a, b) => a.tal - b.tal);
     const sistConser = rollupSistConser(tals);
+    const mapeamentoGrupo = tals.every(t => t.mapeamento === 'Sim') ? 'Sim' : 'Não';
+    const projetoGrupo = tals[0].projeto;
     return {
       blocoId, tals,
       mesPlantio: tals[0].mesPlantio,
       ambiente:   tals[0].ambiente,
       ha:         tals.reduce((s, t) => s + (t.ha || 0), 0),
       sistConser,
-      mapeamento: mapeamentoEfetivo(sistConser, tals[0].mapeamento),
-      projeto:    tals[0].projeto,
+      mapeamento: mapeamentoEfetivo(sistConser, mapeamentoGrupo),
+      projeto:    projetoGrupo,
     };
   }).sort((a, b) => (a.mesPlantio || '9999').localeCompare(b.mesPlantio || '9999'));
 }
