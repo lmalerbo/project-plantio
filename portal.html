@@ -299,10 +299,8 @@ footer {
 const RELEASES_REPO = 'lmalerbo/project-plantio';
 // {COD_FAZ}_{NOME}_{Rev0|Exp0}.{dwg|zip|pdf}
 const ASSET_RE = /^(\d+)_(.+)_(Rev\d+|Exp\d+)\.(dwg|zip|pdf)$/i;
-const DWG_KEY  = 'portal-plantio-dwg';
-
 let allFarms = [];
-let showDwg  = localStorage.getItem(DWG_KEY) === '1';
+let showDwg  = false;
 
 // ── API ────────────────────────────────────────────────────────────────────
 
@@ -517,7 +515,6 @@ document.getElementById('footer').addEventListener('click', () => {
   if (footerTaps >= 5) {
     footerTaps = 0;
     showDwg = !showDwg;
-    localStorage.setItem(DWG_KEY, showDwg ? '1' : '0');
     renderResults();
   }
 });
