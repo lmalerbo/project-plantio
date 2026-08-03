@@ -627,6 +627,34 @@
   }
   .toast.show { transform: translateY(0); opacity: 1; }
 
+  /* ── Tela de login / seleção inicial de usuário ── */
+  #loginScreen {
+    position: fixed; inset: 0; z-index: 400;
+    background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    transition: opacity .3s;
+  }
+  #loginScreen.hiding { opacity: 0; pointer-events: none; }
+  #loginCard {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 38px 32px 32px;
+    width: 400px; max-width: 92vw;
+    text-align: center;
+    box-shadow: var(--shadow);
+  }
+  .login-logo-wrap {
+    display: flex; align-items: center; gap: 12px;
+    justify-content: center; margin-bottom: 30px;
+  }
+  .login-subtitle {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1.2px; color: var(--muted); margin-bottom: 14px;
+  }
+  #loginCard .user-chips { justify-content: center; }
+  #loginCard .user-chip { font-size: 14px; padding: 10px 16px; }
+
   /* ── Modal ── */
   .modal-overlay {
     position: fixed; inset: 0;
@@ -1340,6 +1368,21 @@
   </div>
 </div>
 
+<!-- Tela de Login -->
+<div id="loginScreen" style="display:none">
+  <div id="loginCard">
+    <div class="login-logo-wrap">
+      <div class="logo-mark" style="width:44px;height:44px;font-size:15px;flex-shrink:0">PP</div>
+      <div style="text-align:left">
+        <div style="font-size:15px;font-weight:700;letter-spacing:.3px">Programação Plantio</div>
+        <div style="font-size:11px;color:var(--muted);font-family:monospace">sistema de preenchimento</div>
+      </div>
+    </div>
+    <div class="login-subtitle">Selecione seu usuário</div>
+    <div class="user-chips" id="loginUserChips"></div>
+  </div>
+</div>
+
 <!-- Modal Usuários -->
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
@@ -1554,7 +1597,7 @@ window.onload = async () => {
       panel.classList.remove('open');
     }
   });
-  if (!currentUser) setTimeout(openUserModal, 400);
+  if (!currentUser) openLoginScreen();
   const lastFaz = sessionStorage.getItem(LS('lastFaz'));
   if (lastFaz && FAZENDAS[lastFaz]) selectFazenda(lastFaz);
 };
@@ -1851,7 +1894,11 @@ function getBlocos(name) {
     tals.sort((a, b) => a.tal - b.tal);
     const sistConser = rollupSistConser(tals);
     const mapeamentoGrupo = tals.every(t => t.mapeamento === 'Sim') ? 'Sim' : 'Não';
-    const projetoGrupo = tals[0].projeto;
+    const PROJ_RANK = { 'Aguard. Map.': 0, 'Pendente': 1, 'Andamento': 2, 'Ok': 3 };
+    const projetoGrupo = tals.reduce((worst, t) => {
+      const p = t.projeto || 'Pendente';
+      return (PROJ_RANK[p] ?? 1) < (PROJ_RANK[worst] ?? 1) ? p : worst;
+    }, tals[0].projeto || 'Pendente');
     return {
       blocoId, tals,
       mesPlantio: tals[0].mesPlantio,
@@ -2895,6 +2942,40 @@ function selectUserChip(name) {
   updateUserBadge();
   updateSalvarBtn();
   applyUserPermissions(name);
+}
+
+function openLoginScreen() {
+  const screen = document.getElementById('loginScreen');
+  if (!screen) return;
+  const container = document.getElementById('loginUserChips');
+  const lista = getSelectableUsers();
+  if (!lista.length) {
+    container.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px 0">Nenhum usuário cadastrado.<br>Abra o painel Admin para adicionar usuários.</div>';
+  } else {
+    container.innerHTML = lista.map(u => {
+      const perfis = getUserPerfis(u);
+      const badges = (perfis.includes('preenchimento') ? '<span class="perfil-badge p">P</span>' : '') +
+                     (perfis.includes('dashboard')     ? '<span class="perfil-badge d">D</span>' : '');
+      return `<div class="user-chip" data-nome="${escapeHtml(u)}"><span>${escapeHtml(u)}${badges}</span></div>`;
+    }).join('');
+    container.querySelectorAll('.user-chip').forEach(chip => {
+      chip.addEventListener('click', () => selectUserFromLogin(chip.dataset.nome));
+    });
+  }
+  screen.style.display = 'flex';
+}
+
+function selectUserFromLogin(name) {
+  currentUser = name;
+  localStorage.setItem(LS('user'), name);
+  updateUserBadge();
+  updateSalvarBtn();
+  applyUserPermissions(name);
+  const screen = document.getElementById('loginScreen');
+  if (screen) {
+    screen.classList.add('hiding');
+    setTimeout(() => { screen.style.display = 'none'; screen.classList.remove('hiding'); }, 300);
+  }
 }
 
 function openUserModal() {
