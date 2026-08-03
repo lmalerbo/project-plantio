@@ -2205,7 +2205,7 @@ function abrirArquivosProjeto() {
   _abrirConsolidarModal(`Arquivos do projeto — ${currentFaz}`, `
     <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
       Selecione os arquivos correspondentes aos itens abaixo (pode selecionar vários de uma vez) — o mapa (PDF) é opcional.
-      O nome deve seguir o padrão <code>{COD_FAZ}_{NOME}_{Rev0|Exp0}.{dwg|zip|pdf}</code> (separado por "_") —
+      O nome deve seguir o padrão <code>{COD_FAZ}_{NOME}_{Rev\d+|Exp\d+}.{dwg|zip|pdf}</code> (separado por "_") —
       o nome da fazenda no meio pode variar, o sistema identifica pelo código e pelo sufixo.
     </div>
     <ul id="checklistArquivos" style="list-style:none;padding:0;margin:0 0 8px;font-size:11px;line-height:1.9">
@@ -2242,7 +2242,8 @@ function _adicionarArquivoProjeto(input) {
   for (const file of files) {
     const m = file.name.match(RE_ARQ_PROJETO);
     const item = m && _arquivosEsperados.find(a =>
-      a.cod === m[1] && a.suf.toLowerCase() === m[2].toLowerCase() && a.ext.toLowerCase() === m[3].toLowerCase());
+      a.cod === m[1] && a.ext.toLowerCase() === m[3].toLowerCase() &&
+      a.suf.slice(0,3).toLowerCase() === m[2].slice(0,3).toLowerCase());
 
     if (!item) {
       _logArquivos(`<span style="color:var(--red)">Arquivo fora do padrão esperado (ignorado): ${file.name}</span>`);
@@ -2264,7 +2265,8 @@ function _validarArquivosProjeto() {
   for (const item of _arquivosEsperados) {
     const match = _arquivosSelecionados.find(f => {
       const m = f.name.match(RE_ARQ_PROJETO);
-      return m && m[1] === item.cod && m[2].toLowerCase() === item.suf.toLowerCase() && m[3].toLowerCase() === item.ext.toLowerCase();
+      return m && m[1] === item.cod && m[3].toLowerCase() === item.ext.toLowerCase() &&
+        m[2].slice(0,3).toLowerCase() === item.suf.slice(0,3).toLowerCase();
     });
     item.ok = !!match;
     item.matched = match ? match.name : null;
