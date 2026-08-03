@@ -1,284 +1,463 @@
-﻿<!DOCTYPE html>
-<html lang="pt-BR" data-theme="dark">
+<!DOCTYPE html>
+<html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Portal de Download — Plantio</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Portal Plantio</title>
+<link rel="icon" href="sistema_preenchimento/favicon.svg" type="image/svg+xml">
 <style>
-  :root {
-    --bg:      #101810;
-    --surface: #141F14;
-    --surface2:#1A281A;
-    --border:  #2F422F;
-    --accent:  #4CAF50;
-    --green:   #4CAF72;
-    --blue:    #5A9FD4;
-    --red:     #D95C5C;
-    --text:    #EAE5E0;
-    --muted:   #6A8070;
-    --shadow:  0 2px 8px rgba(0,0,0,.35);
-    --radius:  8px;
-  }
-  [data-theme="light"] {
-    --bg:      #EBF2EB;
-    --surface: #FFFFFF;
-    --surface2:#DFF0DF;
-    --border:  #B8D0B8;
-    --accent:  #2E7D32;
-    --text:    #1C1A18;
-    --muted:   #6B5B50;
-    --shadow:  0 2px 8px rgba(0,0,0,.10);
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Inter','Segoe UI',sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  header {
-    background: var(--surface); border-bottom: 1px solid var(--border);
-    padding: 0 28px; height: 60px;
-    display: flex; align-items: center; justify-content: space-between;
-    position: sticky; top: 0; z-index: 100; box-shadow: var(--shadow);
-  }
-  .logo { display: flex; align-items: center; gap: 12px; }
-  .logo-mark {
-    width: 36px; height: 36px; background: var(--accent); border-radius: 6px;
-    display: flex; align-items: center; justify-content: center;
-    font-weight: 800; font-size: 14px; color: #fff;
-  }
-  .logo-text { font-size: 14px; font-weight: 700; }
-  .logo-sub  { font-size: 11px; color: var(--muted); font-family: monospace; }
-  .header-right { display: flex; gap: 10px; align-items: center; }
-  .btn-header {
-    background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
-    padding: 7px 14px; font-size: 12px; font-weight: 600; color: var(--text);
-    cursor: pointer; text-decoration: none; transition: border-color .2s;
-    font-family: inherit;
-  }
-  .btn-header:hover { border-color: var(--accent); color: var(--accent); }
-  .theme-toggle {
-    width: 34px; height: 34px; background: var(--surface2); border: 1px solid var(--border);
-    border-radius: 6px; display: flex; align-items: center; justify-content: center;
-    cursor: pointer; font-size: 15px; transition: border-color .2s;
-  }
-  .theme-toggle:hover { border-color: var(--accent); }
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: #f9fafb;
+  color: #111827;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
 
-  .main { max-width: 1000px; margin: 0 auto; padding: 28px 24px; }
+/* ── Header ── */
+header {
+  background: #15803d;
+  color: #fff;
+  position: sticky; top: 0; z-index: 10;
+  box-shadow: 0 1px 4px rgba(0,0,0,.2);
+}
+.header-inner {
+  max-width: 960px; margin: 0 auto;
+  padding: 12px 16px;
+  display: flex; align-items: center; gap: 12px;
+}
+.header-logo-box {
+  width: 36px; height: 36px;
+  background: #fff; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.header-logo-box svg { width: 20px; height: 20px; color: #15803d; }
+.header-text { flex: 1; }
+.header-title { font-size: 18px; font-weight: 700; line-height: 1.2; }
+.header-sub { font-size: 12px; color: #bbf7d0; }
+.header-link {
+  font-size: 12px; font-weight: 600; color: #bbf7d0;
+  text-decoration: none; border: 1px solid rgba(255,255,255,.3);
+  border-radius: 6px; padding: 5px 10px; transition: all .15s;
+  white-space: nowrap;
+}
+.header-link:hover { background: rgba(255,255,255,.1); color: #fff; }
 
-  .toolbar {
-    display: flex; gap: 12px; align-items: center; margin-bottom: 24px;
-    flex-wrap: wrap;
-  }
-  .search-wrap { position: relative; flex: 1; min-width: 200px; }
-  .search-wrap input {
-    width: 100%; background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 9px 12px 9px 36px;
-    color: var(--text); font-family: inherit; font-size: 13px; outline: none;
-    transition: border-color .2s;
-  }
-  .search-wrap input:focus { border-color: var(--accent); }
-  .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 14px; pointer-events: none; }
-  .counter { font-size: 12px; color: var(--muted); white-space: nowrap; }
+/* ── Main ── */
+main { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 16px; }
+@media (min-width: 640px) { main { padding: 40px 16px; } }
 
-  .releases-grid { display: flex; flex-direction: column; gap: 14px; }
+.card {
+  background: #fff;
+  border: 1px solid #f3f4f6;
+  border-radius: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.05);
+  padding: 20px;
+  width: 100%; max-width: 640px;
+}
+@media (min-width: 640px) { .card { padding: 28px; } }
 
-  .release-card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 10px; overflow: hidden; box-shadow: var(--shadow);
-    transition: border-color .2s;
-  }
-  .release-card:hover { border-color: var(--accent); }
-  .release-header {
-    padding: 14px 18px; background: var(--surface2);
-    border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: space-between;
-    cursor: pointer; user-select: none;
-  }
-  .release-title { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
-  .release-cod {
-    background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
-    padding: 2px 8px; font-size: 11px; font-family: monospace; color: var(--muted); font-weight: 400;
-  }
-  .release-date { font-size: 11px; color: var(--muted); }
-  .release-chevron { color: var(--muted); font-size: 12px; transition: transform .2s; }
-  .release-card.open .release-chevron { transform: rotate(180deg); }
+/* ── Search ── */
+.search-title {
+  text-align: center; font-size: 17px; font-weight: 600;
+  color: #1f2937; margin-bottom: 4px;
+}
+@media (min-width: 640px) { .search-title { font-size: 19px; } }
+.search-sub { text-align: center; font-size: 13px; color: #9ca3af; margin-bottom: 18px; }
+.search-wrap { position: relative; }
+.search-input {
+  width: 100%; font-size: 15px;
+  border: 1.5px solid #e5e7eb; border-radius: 10px;
+  padding: 12px 42px 12px 14px;
+  outline: none; color: #1f2937;
+  transition: border-color .2s, box-shadow .2s;
+}
+.search-input:focus {
+  border-color: #4ade80;
+  box-shadow: 0 0 0 3px rgba(74,222,128,.15);
+}
+.search-clear {
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer;
+  color: #9ca3af; padding: 4px;
+  display: none; align-items: center; justify-content: center;
+}
+.search-clear.on { display: flex; }
+.search-clear:hover { color: #4b5563; }
 
-  .release-assets { padding: 14px 18px; display: none; flex-direction: column; gap: 8px; }
-  .release-card.open .release-assets { display: flex; }
+/* ── Summary ── */
+.summary { text-align: center; font-size: 12px; color: #9ca3af; margin-top: 10px; }
+.summary strong { color: #6b7280; font-weight: 600; }
 
-  .asset-row {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 9px 12px; background: var(--bg); border: 1px solid var(--border);
-    border-radius: var(--radius); transition: border-color .15s;
-  }
-  .asset-row:hover { border-color: var(--accent); }
-  .asset-left  { display: flex; align-items: center; gap: 10px; }
-  .asset-icon  { font-size: 18px; width: 24px; text-align: center; }
-  .asset-name  { font-size: 13px; font-weight: 500; font-family: monospace; }
-  .asset-size  { font-size: 11px; color: var(--muted); }
-  .btn-download {
-    background: var(--accent); color: #fff; border: none; border-radius: 6px;
-    padding: 6px 14px; font-size: 12px; font-weight: 700; cursor: pointer;
-    text-decoration: none; transition: opacity .15s; font-family: inherit;
-  }
-  .btn-download:hover { opacity: .85; }
+/* ── Recent ── */
+.recent-label {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .6px; color: #9ca3af;
+  text-align: center; margin: 16px 0 8px;
+}
+.recent-pills { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; }
+.recent-pill {
+  font-size: 12px; font-weight: 500; color: #374151;
+  background: #f9fafb; border: 1px solid #e5e7eb;
+  border-radius: 999px; padding: 5px 13px;
+  cursor: pointer; transition: all .15s;
+}
+.recent-pill:hover { background: #f0fdf4; border-color: #86efac; color: #15803d; }
 
-  .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
-  .empty-icon { font-size: 48px; margin-bottom: 12px; opacity: .3; }
-  .empty-text { font-size: 14px; }
+/* ── Loading / Error ── */
+.spinner-wrap {
+  display: flex; align-items: center; justify-content: center;
+  gap: 10px; padding: 44px 0; color: #6b7280; font-size: 14px;
+}
+.spinner {
+  width: 22px; height: 22px;
+  border: 3px solid #16a34a; border-top-color: transparent;
+  border-radius: 50%; animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.error-box {
+  margin-top: 16px;
+  background: #fef2f2; border: 1px solid #fecaca;
+  border-radius: 12px; padding: 16px;
+  color: #b91c1c; display: flex; gap: 10px; font-size: 13px;
+}
+.error-box > svg { flex-shrink: 0; margin-top: 1px; }
 
-  .loading { text-align: center; padding: 60px; color: var(--muted); font-size: 14px; }
-  .error-msg { background: rgba(217,92,92,.1); border: 1px solid var(--red); border-radius: 8px; padding: 14px 18px; color: var(--red); font-size: 13px; margin-bottom: 20px; }
+/* ── Results ── */
+.results-header { display: flex; align-items: center; margin: 18px 0 10px; }
+.results-count { font-size: 13px; color: #6b7280; }
+.results-count strong { color: #1f2937; }
+
+/* ── Farm card ── */
+.farm-card {
+  border: 1px solid #f3f4f6;
+  border-radius: 12px; padding: 12px 14px;
+  margin-bottom: 8px;
+  transition: border-color .15s, box-shadow .15s;
+}
+.farm-card:last-child { margin-bottom: 0; }
+.farm-card:hover { border-color: #86efac; box-shadow: 0 2px 8px rgba(0,0,0,.05); }
+.farm-code { font-size: 11px; color: #9ca3af; font-family: monospace; }
+.farm-name { font-size: 14px; font-weight: 600; color: #1f2937; margin-top: 1px; }
+.farm-date { font-size: 11px; color: #9ca3af; margin-top: 1px; }
+.farm-files { margin-top: 9px; display: flex; flex-direction: column; gap: 5px; }
+.file-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.file-suffix {
+  font-size: 10px; font-weight: 700; font-family: monospace;
+  background: #f3f4f6; color: #4b5563;
+  border-radius: 4px; padding: 2px 6px; flex-shrink: 0;
+}
+.btn-dl {
+  display: inline-flex; align-items: center; gap: 5px;
+  border: none; border-radius: 7px; padding: 5px 11px;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  text-decoration: none; transition: background .15s;
+}
+.btn-zip  { background: #16a34a; color: #fff; }
+.btn-zip:hover  { background: #15803d; }
+.btn-dwg  { background: #f3f4f6; color: #4b5563; }
+.btn-dwg:hover  { background: #e5e7eb; }
+.btn-pdf  { background: none; color: #4f46e5; font-weight: 500; padding: 5px 8px; border-radius: 7px; }
+.btn-pdf:hover  { background: #eef2ff; }
+.file-size { font-size: 10px; font-weight: 400; opacity: .8; }
+
+/* ── Empty ── */
+.empty {
+  background: #f9fafb; border: 1px solid #f3f4f6;
+  border-radius: 14px; padding: 52px 20px;
+  text-align: center; color: #9ca3af; margin-top: 4px;
+}
+.empty-icon { width: 48px; height: 48px; margin: 0 auto 12px; color: #e5e7eb; }
+.empty p { font-size: 13px; margin-bottom: 14px; }
+.empty-wa {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 500; color: #15803d; text-decoration: underline;
+}
+.empty-wa:hover { color: #166534; }
+
+/* ── Footer ── */
+footer {
+  text-align: center; padding: 14px;
+  font-size: 12px; color: #9ca3af;
+  border-top: 1px solid #f3f4f6;
+  cursor: default; -webkit-user-select: none; user-select: none;
+}
+.hidden { display: none; }
 </style>
 </head>
 <body>
+
 <header>
-  <div class="logo">
-    <div class="logo-mark">PLT</div>
-    <div>
-      <div class="logo-text">PROGRAMAÇÃO PLANTIO</div>
-      <div class="logo-sub">portal de download</div>
+  <div class="header-inner">
+    <div class="header-logo-box">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064" />
+      </svg>
     </div>
-  </div>
-  <div class="header-right">
-    <a href="sistema_preenchimento/formulario.html" class="btn-header">↗ Preenchimento</a>
-    <button class="theme-toggle" onclick="toggleTheme()" title="Alternar tema">☀</button>
+    <div class="header-text">
+      <div class="header-title">Portal Plantio</div>
+      <div class="header-sub">Projetos de Plantio</div>
+    </div>
+    <a href="sistema_preenchimento/formulario.html" class="header-link">Preenchimento ↗</a>
   </div>
 </header>
 
-<div class="main">
-  <div class="toolbar">
+<main>
+  <div class="card">
+    <h2 class="search-title">Buscar projeto de plantio</h2>
+    <p class="search-sub">Pesquise pelo nome ou código da fazenda</p>
+
     <div class="search-wrap">
-      <span class="search-icon">🔍</span>
-      <input type="text" id="searchInput" placeholder="Buscar fazenda..." oninput="filtrar()">
+      <input class="search-input" id="searchInput" type="text" inputmode="search"
+             placeholder="Buscar por nome ou código..." autocomplete="off" />
+      <button class="search-clear" id="searchClear" type="button" aria-label="Limpar busca">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
     </div>
-    <span class="counter" id="counter">carregando...</span>
+
+    <p class="summary hidden" id="summary"></p>
+
+    <div id="recentWrap" class="hidden">
+      <p class="recent-label">Atualizados recentemente</p>
+      <div class="recent-pills" id="recentPills"></div>
+    </div>
+
+    <div class="spinner-wrap" id="loadingEl">
+      <div class="spinner"></div>
+      <span>Carregando projetos...</span>
+    </div>
+
+    <div class="error-box hidden" id="errorEl">
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      <span id="errorMsg"></span>
+    </div>
+
+    <div id="resultsEl" class="hidden">
+      <div class="results-header">
+        <span class="results-count" id="resultsCount"></span>
+      </div>
+      <div id="resultsList"></div>
+    </div>
   </div>
-  <div id="content"><div class="loading">Carregando releases...</div></div>
-</div>
+</main>
+
+<footer id="footer">Portal Plantio — Projetos de Plantio</footer>
 
 <script>
-const GH_OWNER = 'lmalerbo';
-const GH_REPO  = 'project-plantio';
-const API_URL  = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/releases`;
+const RELEASES_REPO = 'lmalerbo/project-plantio';
+// {COD_FAZ}_{NOME}_{Rev0|Exp0}.{dwg|zip|pdf}
+const ASSET_RE = /^(\d+)_(.+)_(Rev\d+|Exp\d+)\.(dwg|zip|pdf)$/i;
+const DWG_KEY  = 'portal-plantio-dwg';
 
-let allReleases = [];
+let allFarms = [];
+let showDwg  = localStorage.getItem(DWG_KEY) === '1';
 
-function escapeHtml(s) {
-  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-
-function fileIcon(name) {
-  const ext = name.split('.').pop().toLowerCase();
-  return ext === 'dwg' ? '📐' : ext === 'pdf' ? '📄' : ext === 'zip' ? '📦' : '📎';
-}
-
-function fileLabel(name) {
-  const ext = name.split('.').pop().toLowerCase();
-  if (ext === 'dwg')  return 'Projeto';
-  if (ext === 'zip')  return 'Exportação';
-  if (ext === 'pdf')  return 'Mapa';
-  return ext.toUpperCase();
-}
-
-function fmtBytes(b) {
-  if (b < 1024) return `${b} B`;
-  if (b < 1024*1024) return `${(b/1024).toFixed(0)} KB`;
-  return `${(b/1024/1024).toFixed(1)} MB`;
-}
-
-function fmtDate(iso) {
-  return new Date(iso).toLocaleDateString('pt-BR', { day:'2-digit', month:'short', year:'numeric' });
-}
-
-function renderReleases(releases) {
-  const content = document.getElementById('content');
-  if (!releases.length) {
-    content.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">Nenhuma fazenda encontrada.</div></div>`;
-    return;
-  }
-
-  content.innerHTML = `<div class="releases-grid">${releases.map(rel => {
-    const assets = (rel.assets || []);
-    const assetsHtml = assets.length ? assets.map(a => `
-      <div class="asset-row">
-        <div class="asset-left">
-          <span class="asset-icon">${fileIcon(a.name)}</span>
-          <div>
-            <div class="asset-name">${escapeHtml(a.name)}</div>
-            <div class="asset-size">${fileLabel(a.name)} · ${fmtBytes(a.size)}</div>
-          </div>
-        </div>
-        <a class="btn-download" href="${escapeHtml(a.browser_download_url)}" download>Baixar</a>
-      </div>`).join('') : `<div style="color:var(--muted);font-size:13px">Nenhum arquivo nesta fazenda.</div>`;
-
-    return `
-    <div class="release-card open" data-name="${escapeHtml(rel.name || rel.tag_name)}">
-      <div class="release-header" onclick="toggleCard(this.parentElement)">
-        <div class="release-title">
-          ${escapeHtml(rel.name || rel.tag_name)}
-          <span class="release-cod">${escapeHtml(rel.tag_name)}</span>
-        </div>
-        <div style="display:flex;gap:14px;align-items:center">
-          <span class="release-date">${fmtDate(rel.published_at || rel.created_at)}</span>
-          <span class="release-chevron">▲</span>
-        </div>
-      </div>
-      <div class="release-assets">${assetsHtml}</div>
-    </div>`;
-  }).join('')}</div>`;
-
-  document.getElementById('counter').textContent = `${releases.length} fazenda(s)`;
-}
-
-function toggleCard(card) {
-  card.classList.toggle('open');
-}
-
-function filtrar() {
-  const q = document.getElementById('searchInput').value.trim().toLowerCase();
-  const filtered = q ? allReleases.filter(r => (r.name || r.tag_name).toLowerCase().includes(q)) : allReleases;
-  renderReleases(filtered);
-}
+// ── API ────────────────────────────────────────────────────────────────────
 
 async function fetchAllReleases() {
-  const PAGE_SIZE = 100;
-  let page = 1;
-  let all = [];
-  while (true) {
-    const res = await fetch(`${API_URL}?per_page=${PAGE_SIZE}&page=${page}`);
-    if (!res.ok) {
-      if (res.status === 403) {
-        throw new Error('limite de requisições da API do GitHub atingido — aguarde uma hora e tente de novo');
+  const releases = [];
+  let url = `https://api.github.com/repos/${RELEASES_REPO}/releases?per_page=100`;
+  while (url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Erro ${res.status} ao buscar releases`);
+    releases.push(...await res.json());
+    const link = res.headers.get('Link') || '';
+    const m = link.match(/<([^>]+)>;\s*rel="next"/);
+    url = m ? m[1] : null;
+  }
+  return releases;
+}
+
+function parseReleases(releases) {
+  const farmMap = new Map();
+  for (const release of releases) {
+    for (const asset of (release.assets ?? [])) {
+      const m = asset.name.match(ASSET_RE);
+      if (!m) continue;
+      const [, codFaz, rawName, suffix, ext] = m;
+      const farmName = rawName.trim();
+      if (!farmMap.has(codFaz)) {
+        farmMap.set(codFaz, { codFaz, name: farmName, files: [], updatedAt: asset.updated_at });
       }
-      throw new Error(`GitHub API: ${res.status} ${res.statusText}`);
+      const farm = farmMap.get(codFaz);
+      // Prefere o nome mais longo (mais completo) encontrado nos assets
+      if (farmName.length > farm.name.length) farm.name = farmName;
+      farm.files.push({
+        suffix, ext: ext.toLowerCase(),
+        size: asset.size, url: asset.browser_download_url, name: asset.name,
+        updatedAt: asset.updated_at,
+      });
+      if (asset.updated_at > farm.updatedAt) farm.updatedAt = asset.updated_at;
     }
-    const batch = await res.json();
-    all = all.concat(batch);
-    if (batch.length < PAGE_SIZE) break;
-    page++;
   }
-  return all;
+  return [...farmMap.values()].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 }
 
-async function load() {
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function fmtSize(bytes) {
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+function fmtDate(iso) { return new Date(iso).toLocaleDateString('pt-BR'); }
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+const ICON_DL  = `<svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>`;
+const ICON_PDF = `<svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>`;
+
+// ── Render ─────────────────────────────────────────────────────────────────
+
+function renderFarm(farm) {
+  // Agrupar por suffix, depois por extensão
+  const bySuffix = new Map();
+  for (const f of farm.files) {
+    if (!bySuffix.has(f.suffix)) bySuffix.set(f.suffix, {});
+    bySuffix.get(f.suffix)[f.ext] = f;
+  }
+
+  const rowsHtml = [...bySuffix.entries()].map(([suffix, byExt]) => {
+    const zip = byExt['zip'];
+    const dwg = byExt['dwg'];
+    const pdf = byExt['pdf'];
+    const parts = [`<span class="file-suffix">${esc(suffix)}</span>`];
+
+    if (zip) {
+      parts.push(`<a class="btn-dl btn-zip" href="${esc(zip.url)}" target="_blank" rel="noreferrer" download="${esc(zip.name)}">${ICON_DL} ZIP <span class="file-size">${fmtSize(zip.size)}</span></a>`);
+    }
+    // DWG: sempre visível se não há ZIP; ou no modo técnico (5 toques no rodapé)
+    if (dwg && (!zip || showDwg)) {
+      parts.push(`<a class="btn-dl btn-dwg" href="${esc(dwg.url)}" target="_blank" rel="noreferrer" download="${esc(dwg.name)}">${ICON_DL} DWG <span class="file-size">${fmtSize(dwg.size)}</span></a>`);
+    }
+    if (pdf) {
+      parts.push(`<a class="btn-dl btn-pdf" href="${esc(pdf.url)}" target="_blank" rel="noreferrer">${ICON_PDF} PDF</a>`);
+    }
+    return `<div class="file-row">${parts.join('')}</div>`;
+  }).join('');
+
+  return `<div class="farm-card">
+    <div class="farm-code">${esc(farm.codFaz)}</div>
+    <div class="farm-name">${esc(farm.name)}</div>
+    <div class="farm-date">atualizado em ${fmtDate(farm.updatedAt)}</div>
+    <div class="farm-files">${rowsHtml}</div>
+  </div>`;
+}
+
+function renderResults() {
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  const resultsEl = document.getElementById('resultsEl');
+  if (!q) { resultsEl.classList.add('hidden'); return; }
+
+  const filtered = allFarms.filter(f =>
+    f.name.toLowerCase().includes(q) || f.codFaz.includes(q)
+  );
+
+  resultsEl.classList.remove('hidden');
+  const countEl = document.getElementById('resultsCount');
+  const listEl  = document.getElementById('resultsList');
+
+  if (filtered.length === 0) {
+    const txt = document.getElementById('searchInput').value.trim();
+    const waMsg = encodeURIComponent(`Olá! Gostaria de solicitar a disponibilização do projeto de plantio para a fazenda "${txt}", que ainda não está disponível no Portal Plantio.`);
+    countEl.innerHTML = 'Nenhum projeto encontrado';
+    listEl.innerHTML = `<div class="empty">
+      <svg class="empty-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+      </svg>
+      <p>Nenhum projeto disponível para essa busca.</p>
+      <a class="empty-wa" href="https://wa.me/5516996427394?text=${waMsg}" target="_blank" rel="noreferrer">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M17.498 14.382c-.301-.15-1.767-.867-2.04-.966-.273-.101-.473-.15-.673.15-.197.295-.771.964-.944 1.162-.175.195-.349.21-.646.075-1.888-.95-3.13-1.696-4.378-3.85-.27-.448.27-.421.772-1.401.099-.198.05-.371-.075-.521-.123-.151-.6-1.443-.823-1.992-.218-.535-.44-.46-.6-.47-.149-.01-.32-.01-.494-.01-.174 0-.457.065-.697.315-.24.249-.916.892-.916 2.18 0 1.282 1.038 2.522 1.183 2.696.149.173 2.04 3.116 4.948 4.245 2.91 1.129 2.91.752 3.435.706.525-.049 1.692-.692 1.93-1.36.24-.668.24-1.242.166-1.36-.074-.123-.273-.198-.572-.348z"/>
+          <path d="M12 0C5.376 0 0 5.376 0 12c0 2.12.554 4.108 1.52 5.84L0 24l6.32-1.49A11.93 11.93 0 0012 24c6.624 0 12-5.376 12-12S18.624 0 12 0zm0 21.81c-2.063 0-4.025-.59-5.71-1.643l-.41-.255-4.227 1 .997-4.116-.27-.43A9.78 9.78 0 012.19 12c0-5.413 4.397-9.81 9.81-9.81 5.413 0 9.81 4.397 9.81 9.81 0 5.413-4.397 9.81-9.81 9.81z"/>
+        </svg>
+        Solicitar via WhatsApp
+      </a>
+    </div>`;
+  } else {
+    const n = filtered.length;
+    countEl.innerHTML = `<strong>${n}</strong> fazenda${n !== 1 ? 's' : ''} encontrada${n !== 1 ? 's' : ''}`;
+    listEl.innerHTML = filtered.map(renderFarm).join('');
+  }
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+
+window.addEventListener('DOMContentLoaded', async () => {
   try {
-    allReleases = await fetchAllReleases();
-    // Sort by name (fazenda name)
-    allReleases.sort((a, b) => (a.name || a.tag_name).localeCompare(b.name || b.tag_name, 'pt-BR'));
-    renderReleases(allReleases);
+    const releases = await fetchAllReleases();
+    allFarms = parseReleases(releases);
+    document.getElementById('loadingEl').classList.add('hidden');
+
+    if (allFarms.length) {
+      const lastDate = allFarms.map(f => f.updatedAt).sort().at(-1);
+      const s = document.getElementById('summary');
+      s.classList.remove('hidden');
+      s.innerHTML = `<strong>${allFarms.length}</strong> fazenda${allFarms.length !== 1 ? 's' : ''} disponíve${allFarms.length !== 1 ? 'is' : 'l'} · atualizado em ${fmtDate(lastDate)}`;
+
+      const recent = [...allFarms].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 5);
+      const recentWrap  = document.getElementById('recentWrap');
+      const recentPills = document.getElementById('recentPills');
+      recentWrap.classList.remove('hidden');
+      recentPills.innerHTML = recent.map(f =>
+        `<button class="recent-pill" type="button" data-name="${esc(f.name)}">${esc(f.name)}</button>`
+      ).join('');
+      recentPills.querySelectorAll('.recent-pill').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.getElementById('searchInput').value = btn.dataset.name;
+          document.getElementById('searchInput').dispatchEvent(new Event('input'));
+          document.getElementById('searchInput').focus();
+        });
+      });
+    }
   } catch (e) {
-    document.getElementById('content').innerHTML =
-      `<div class="error-msg">Erro ao carregar releases: ${escapeHtml(e.message)}</div>`;
-    document.getElementById('counter').textContent = 'erro';
+    document.getElementById('loadingEl').classList.add('hidden');
+    document.getElementById('errorEl').classList.remove('hidden');
+    document.getElementById('errorMsg').textContent = e.message;
   }
-}
+});
 
-function toggleTheme() {
-  const h = document.documentElement;
-  h.setAttribute('data-theme', h.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
-}
+// ── Search ─────────────────────────────────────────────────────────────────
 
-load();
+document.getElementById('searchInput').addEventListener('input', function () {
+  const q = this.value;
+  document.getElementById('searchClear').classList.toggle('on', !!q);
+  document.getElementById('recentWrap').classList.toggle('hidden', !(!q && allFarms.length));
+  renderResults();
+});
+
+document.getElementById('searchClear').addEventListener('click', () => {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('searchInput').dispatchEvent(new Event('input'));
+  document.getElementById('searchInput').focus();
+});
+
+// ── Footer: 5 toques em 1.5 s → alterna modo técnico (mostra DWG) ─────────
+
+let footerTaps = 0, footerTimer = null;
+document.getElementById('footer').addEventListener('click', () => {
+  footerTaps++;
+  clearTimeout(footerTimer);
+  footerTimer = setTimeout(() => { footerTaps = 0; }, 1500);
+  if (footerTaps >= 5) {
+    footerTaps = 0;
+    showDwg = !showDwg;
+    localStorage.setItem(DWG_KEY, showDwg ? '1' : '0');
+    renderResults();
+  }
+});
 </script>
 </body>
 </html>
