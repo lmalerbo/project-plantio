@@ -399,8 +399,8 @@ function renderFarm(farm) {
     if (zip) {
       parts.push(`<a class="btn-dl btn-zip" href="${esc(zip.url)}" target="_blank" rel="noreferrer" download="${esc(zip.name)}">${ICON_DL} ZIP <span class="file-size">${fmtSize(zip.size)}</span></a>`);
     }
-    // DWG: sempre visível se não há ZIP; ou no modo técnico (5 toques no rodapé)
-    if (dwg && (!zip || showDwg)) {
+    // DWG: visível apenas no modo técnico (5 toques no rodapé)
+    if (dwg && showDwg) {
       parts.push(`<a class="btn-dl btn-dwg" href="${esc(dwg.url)}" target="_blank" rel="noreferrer" download="${esc(dwg.name)}">${ICON_DL} DWG <span class="file-size">${fmtSize(dwg.size)}</span></a>`);
     }
     if (pdf) {
