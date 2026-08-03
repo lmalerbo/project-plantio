@@ -19,7 +19,7 @@ body {
 
 /* ── Header ── */
 header {
-  background: #15803d;
+  background: #1d4ed8;
   color: #fff;
   position: sticky; top: 0; z-index: 10;
   box-shadow: 0 1px 4px rgba(0,0,0,.2);
@@ -35,12 +35,12 @@ header {
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
-.header-logo-box svg { width: 20px; height: 20px; color: #15803d; }
+.header-logo-box svg { width: 20px; height: 20px; color: #1d4ed8; }
 .header-text { flex: 1; }
 .header-title { font-size: 18px; font-weight: 700; line-height: 1.2; }
-.header-sub { font-size: 12px; color: #bbf7d0; }
+.header-sub { font-size: 12px; color: #bfdbfe; }
 .header-link {
-  font-size: 12px; font-weight: 600; color: #bbf7d0;
+  font-size: 12px; font-weight: 600; color: #bfdbfe;
   text-decoration: none; border: 1px solid rgba(255,255,255,.3);
   border-radius: 6px; padding: 5px 10px; transition: all .15s;
   white-space: nowrap;
@@ -77,8 +77,8 @@ main { flex: 1; display: flex; flex-direction: column; align-items: center; padd
   transition: border-color .2s, box-shadow .2s;
 }
 .search-input:focus {
-  border-color: #4ade80;
-  box-shadow: 0 0 0 3px rgba(74,222,128,.15);
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 3px rgba(96,165,250,.15);
 }
 .search-clear {
   position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
@@ -106,7 +106,7 @@ main { flex: 1; display: flex; flex-direction: column; align-items: center; padd
   border-radius: 999px; padding: 5px 13px;
   cursor: pointer; transition: all .15s;
 }
-.recent-pill:hover { background: #f0fdf4; border-color: #86efac; color: #15803d; }
+.recent-pill:hover { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
 
 /* ── Loading / Error ── */
 .spinner-wrap {
@@ -115,7 +115,7 @@ main { flex: 1; display: flex; flex-direction: column; align-items: center; padd
 }
 .spinner {
   width: 22px; height: 22px;
-  border: 3px solid #16a34a; border-top-color: transparent;
+  border: 3px solid #2563eb; border-top-color: transparent;
   border-radius: 50%; animation: spin .7s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -140,7 +140,7 @@ main { flex: 1; display: flex; flex-direction: column; align-items: center; padd
   transition: border-color .15s, box-shadow .15s;
 }
 .farm-card:last-child { margin-bottom: 0; }
-.farm-card:hover { border-color: #86efac; box-shadow: 0 2px 8px rgba(0,0,0,.05); }
+.farm-card:hover { border-color: #93c5fd; box-shadow: 0 2px 8px rgba(0,0,0,.05); }
 .farm-code { font-size: 11px; color: #9ca3af; font-family: monospace; }
 .farm-name { font-size: 14px; font-weight: 600; color: #1f2937; margin-top: 1px; }
 .farm-date { font-size: 11px; color: #9ca3af; margin-top: 1px; }
@@ -157,12 +157,14 @@ main { flex: 1; display: flex; flex-direction: column; align-items: center; padd
   font-size: 12px; font-weight: 600; cursor: pointer;
   text-decoration: none; transition: background .15s;
 }
-.btn-zip  { background: #16a34a; color: #fff; }
-.btn-zip:hover  { background: #15803d; }
+.btn-zip  { background: #2563eb; color: #fff; }
+.btn-zip:hover  { background: #1d4ed8; }
 .btn-dwg  { background: #f3f4f6; color: #4b5563; }
 .btn-dwg:hover  { background: #e5e7eb; }
-.btn-pdf  { background: none; color: #4f46e5; font-weight: 500; padding: 5px 8px; border-radius: 7px; }
+.btn-pdf  { background: none; color: #4f46e5; font-weight: 600; padding: 5px 8px; border-radius: 7px; font-family: inherit; }
 .btn-pdf:hover  { background: #eef2ff; }
+.btn-pdf-dl { background: none; color: #6b7280; font-size: 11px; font-weight: 500; padding: 5px 6px; border-radius: 6px; border: none; cursor: pointer; font-family: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+.btn-pdf-dl:hover { background: #f1f5f9; color: #374151; }
 .file-size { font-size: 10px; font-weight: 400; opacity: .8; }
 
 /* ── Empty ── */
@@ -175,9 +177,36 @@ main { flex: 1; display: flex; flex-direction: column; align-items: center; padd
 .empty p { font-size: 13px; margin-bottom: 14px; }
 .empty-wa {
   display: inline-flex; align-items: center; gap: 6px;
-  font-size: 13px; font-weight: 500; color: #15803d; text-decoration: underline;
+  font-size: 13px; font-weight: 500; color: #1d4ed8; text-decoration: underline;
 }
-.empty-wa:hover { color: #166534; }
+.empty-wa:hover { color: #1e3a8a; }
+
+/* ── PDF Viewer Overlay ── */
+.viewer-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.55); z-index: 1000;
+  align-items: center; justify-content: center;
+}
+.viewer-overlay.open { display: flex; }
+.viewer-box {
+  background: #fff; border-radius: 12px;
+  width: 90vw; height: 90vh; max-width: 1100px;
+  display: flex; flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0,0,0,.25); overflow: hidden;
+}
+.viewer-head {
+  padding: 12px 16px; background: #f3f4f6; border-bottom: 1px solid #e5e7eb;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  flex-shrink: 0;
+}
+.viewer-fname { font-size: 13px; font-weight: 600; font-family: monospace; color: #374151; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.viewer-close {
+  background: none; border: none; font-size: 24px; line-height: 1;
+  cursor: pointer; color: #9ca3af; padding: 0 4px; flex-shrink: 0;
+}
+.viewer-close:hover { color: #b91c1c; }
+.viewer-body { flex: 1; overflow: hidden; }
+.viewer-body iframe { width: 100%; height: 100%; border: none; display: block; }
 
 /* ── Footer ── */
 footer {
@@ -253,6 +282,19 @@ footer {
 
 <footer id="footer">Portal Plantio — Projetos de Plantio</footer>
 
+<!-- PDF Viewer Overlay -->
+<div class="viewer-overlay" id="viewerOverlay">
+  <div class="viewer-box">
+    <div class="viewer-head">
+      <span class="viewer-fname" id="viewerFname"></span>
+      <button class="viewer-close" type="button" onclick="closeViewer()" aria-label="Fechar">&#215;</button>
+    </div>
+    <div class="viewer-body">
+      <iframe id="viewerFrame" src="" title="Visualizador PDF"></iframe>
+    </div>
+  </div>
+</div>
+
 <script>
 const RELEASES_REPO = 'lmalerbo/project-plantio';
 // {COD_FAZ}_{NOME}_{Rev0|Exp0}.{dwg|zip|pdf}
@@ -317,6 +359,26 @@ function esc(s) {
 
 const ICON_DL  = `<svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>`;
 const ICON_PDF = `<svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>`;
+const ICON_EYE = `<svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>`;
+
+// ── PDF Viewer ─────────────────────────────────────────────────────────────
+
+function openViewer(url, name) {
+  const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
+  document.getElementById('viewerFname').textContent = name;
+  document.getElementById('viewerFrame').src = viewerUrl;
+  document.getElementById('viewerOverlay').classList.add('open');
+}
+function closeViewer() {
+  document.getElementById('viewerOverlay').classList.remove('open');
+  document.getElementById('viewerFrame').src = '';
+}
+document.getElementById('viewerOverlay').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeViewer();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeViewer();
+});
 
 // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -342,7 +404,8 @@ function renderFarm(farm) {
       parts.push(`<a class="btn-dl btn-dwg" href="${esc(dwg.url)}" target="_blank" rel="noreferrer" download="${esc(dwg.name)}">${ICON_DL} DWG <span class="file-size">${fmtSize(dwg.size)}</span></a>`);
     }
     if (pdf) {
-      parts.push(`<a class="btn-dl btn-pdf" href="${esc(pdf.url)}" target="_blank" rel="noreferrer">${ICON_PDF} PDF</a>`);
+      parts.push(`<button class="btn-dl btn-pdf" type="button" data-url="${esc(pdf.url)}" data-name="${esc(pdf.name)}" onclick="openViewer(this.dataset.url,this.dataset.name)">${ICON_EYE} Ver PDF</button>`);
+      parts.push(`<a class="btn-pdf-dl" href="${esc(pdf.url)}" target="_blank" rel="noreferrer" download="${esc(pdf.name)}">${ICON_DL} Baixar</a>`);
     }
     return `<div class="file-row">${parts.join('')}</div>`;
   }).join('');
