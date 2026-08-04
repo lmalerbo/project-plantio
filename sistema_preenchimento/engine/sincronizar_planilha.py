@@ -49,7 +49,9 @@ import xlwings as xw
 
 _config_path = os.path.join(_BASE_DIR, 'supabase_config.json')
 if not os.path.exists(_config_path):
-    print(f"ERRO: Arquivo nao encontrado → {_config_path}")
+    _config_path = os.path.join(_SCRIPT_DIR, 'supabase_config.json')  # fallback: engine/
+if not os.path.exists(_config_path):
+    print("ERRO: supabase_config.json não encontrado nem na pasta da planilha nem em engine/")
     fechar_log(_log_fh)
     input("\nPressione Enter para sair...")
     sys.exit(1)
@@ -72,12 +74,14 @@ SB_HEADERS = {
 # planilha como somente-leitura ao automatizar via COM (sem dialogo pra perguntar),
 # e wb.save() não lança erro mas também não grava nada no disco.
 _planilha_cfg_path = os.path.join(_BASE_DIR, 'planilha_config.json')
+if not os.path.exists(_planilha_cfg_path):
+    _planilha_cfg_path = os.path.join(_SCRIPT_DIR, 'planilha_config.json')  # fallback: engine/
 SENHA_PLANILHA = None
 if os.path.exists(_planilha_cfg_path):
     with open(_planilha_cfg_path, 'r', encoding='utf-8') as _f:
         SENHA_PLANILHA = json.load(_f).get('senha_plantio') or None
 if not SENHA_PLANILHA:
-    print(f"AVISO: {_planilha_cfg_path} não encontrado ou sem 'senha_plantio' — "
+    print(f"AVISO: planilha_config.json não encontrado ou sem 'senha_plantio' — "
           "se a planilha tiver senha de gravação, a sincronização vai abrir em modo "
           "somente-leitura e salvar silenciosamente sem efeito.\n")
 
@@ -116,26 +120,32 @@ print(f"  {len(blocos)} bloco(s) carregado(s) do Supabase.\n")
 # rede onde ela mora — ver docstring no topo do arquivo). Ignora os arquivos
 # de lock temporário do Excel ("~$nome.xlsx", criados enquanto o arquivo está
 # aberto em outra instância).
-print("Localizando linhas na planilha de Sequência de Plantio...")
-_plantio_found = [f for f in _glob.glob("*.xlsx") if not os.path.basename(f).startswith('~$')]
-if not _plantio_found:
+print("Localizando planilha de Sequência de Plantio...")
+_xlsx_candidates = sorted(f for f in _glob.glob("*.xlsx") if not os.path.basename(f).startswith('~$'))
+if not _xlsx_candidates:
     print("ERRO: Nenhum arquivo .xlsx encontrado nesta pasta.")
     fechar_log(_log_fh)
     input("\nPressione Enter para sair...")
     sys.exit(1)
-if len(_plantio_found) > 1:
-    print(f"  AVISO: {len(_plantio_found)} arquivos .xlsx nesta pasta — usando o primeiro encontrado "
-          f"({_plantio_found[0]}); remova os demais pra evitar ambiguidade.")
-SOURCE_PLANTIO = os.path.abspath(_plantio_found[0])
-print(f"  Planilha de plantio: {SOURCE_PLANTIO}")
 
-wb_ro = openpyxl.load_workbook(SOURCE_PLANTIO, data_only=True)
-sheet_seq = next((n for n in wb_ro.sheetnames if norm_header(n) == 'SEQUENCIA'), None)
-if not sheet_seq:
-    print(f"ERRO: Aba 'Sequencia' não encontrada. Abas disponíveis: {wb_ro.sheetnames}")
+SOURCE_PLANTIO = None
+sheet_seq = None
+for _candidate in _xlsx_candidates:
+    _wb_check = openpyxl.load_workbook(_candidate, read_only=True, data_only=True)
+    _seq = next((n for n in _wb_check.sheetnames if norm_header(n) == 'SEQUENCIA'), None)
+    _wb_check.close()
+    if _seq:
+        SOURCE_PLANTIO = os.path.abspath(_candidate)
+        sheet_seq = _seq
+        break
+if not SOURCE_PLANTIO:
+    print(f"ERRO: Nenhum .xlsx com aba 'Sequencia' encontrado. Arquivos verificados: {_xlsx_candidates}")
     fechar_log(_log_fh)
     input("\nPressione Enter para sair...")
     sys.exit(1)
+print(f"  Planilha: {SOURCE_PLANTIO}")
+
+wb_ro = openpyxl.load_workbook(SOURCE_PLANTIO, data_only=True)
 ws_ro = wb_ro[sheet_seq]
 
 LIMITE_COL = openpyxl.utils.column_index_from_string('AB')
