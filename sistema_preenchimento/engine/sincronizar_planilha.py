@@ -213,8 +213,8 @@ if not linhas_para_escrever:
 # substitui o original via os.replace() (atômico, não depende do Excel) em vez
 # de salvar direto por cima — reduz o impacto de qualquer outra contenção
 # pontual (antivírus/indexador) no exato momento da troca do arquivo.
-print("Abrindo Excel para escrever e salvar...")
 COL_AA, COL_AB, COL_AC = 27, 28, 29   # Sist. Conser. / Mapeamento / Projeto-Mapa (1-based)
+print(f"Abrindo Excel para escrever... (colunas AA={COL_AA} AB={COL_AB} AC={COL_AC})")
 
 _tmp_path = SOURCE_PLANTIO + '.sync_tmp.xlsx'
 if os.path.exists(_tmp_path):
@@ -223,23 +223,39 @@ if os.path.exists(_tmp_path):
 app = xw.App(visible=False)
 app.display_alerts = False
 try:
-    wb = app.books.open(SOURCE_PLANTIO, password=SENHA_PLANILHA)
+    # write_res_password = senha de proteção de gravação (diferente da senha de abertura)
+    wb = app.books.open(SOURCE_PLANTIO,
+                        password=SENHA_PLANILHA,
+                        write_res_password=SENHA_PLANILHA)
+    print(f"  ReadOnly={wb.api.ReadOnly}")
     ws = wb.sheets[sheet_seq]
     for linha, sist_conser, mapeamento, projeto in linhas_para_escrever:
         ws.range((linha, COL_AA)).value = sist_conser
         ws.range((linha, COL_AB)).value = mapeamento
         ws.range((linha, COL_AC)).value = projeto
     ws.range((3, COL_AC)).value = f"Atualizado em: {datetime.date.today().strftime('%d/%m/%Y')}"
+    # Verificação: lê de volta a primeira linha escrita
+    if linhas_para_escrever:
+        l0, sc0, ma0, pr0 = linhas_para_escrever[0]
+        sc_v = ws.range((l0, COL_AA)).value
+        ma_v = ws.range((l0, COL_AB)).value
+        pr_v = ws.range((l0, COL_AC)).value
+        print(f"  Verificação linha {l0}: AA={sc_v!r} AB={ma_v!r} AC={pr_v!r}  "
+              f"(esperado: AA={sc0!r} AB={ma0!r} AC={pr0!r})")
     wb.save(_tmp_path)
 finally:
     wb.close()
     app.quit()
 
+_orig_size = os.path.getsize(SOURCE_PLANTIO)
+_tmp_size  = os.path.getsize(_tmp_path)
+print(f"  tmp salvo: {_tmp_size} bytes  (original: {_orig_size} bytes)")
 try:
     os.replace(_tmp_path, SOURCE_PLANTIO)
-except OSError:
-    # Fallback para drives de rede onde os.replace pode falhar com lock SMB
+    print("  os.replace OK")
+except OSError as _e:
     import shutil
+    print(f"  os.replace falhou ({_e}), usando shutil.copy2")
     shutil.copy2(_tmp_path, SOURCE_PLANTIO)
     os.remove(_tmp_path)
 print(f"  {len(linhas_para_escrever)} linha(s) escrita(s) e planilha salva.")
