@@ -1311,11 +1311,11 @@
       <div class="admin-panel-section-title">Sincronizar Planilha <span class="frente-tag">Chrome/Edge</span></div>
 
       <label class="admin-label">Sequência de Plantio</label>
-      <p class="admin-note" style="margin-bottom:8px">Instala o <strong>SINCRONIZAR_PLANILHA.bat</strong> na pasta da planilha para escrever o status de volta.</p>
+      <p class="admin-note" style="margin-bottom:8px">Instala os scripts na pasta <code>engine/</code> da planilha. Depois, rode o atalho <strong>ATUALIZAR_PROJETOS</strong> para escrever o status de volta na planilha.</p>
       <div class="admin-pasta-status" id="pastaPlanilhaStatus">Nenhuma pasta configurada.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn-outline" onclick="escolherPastaPlanilha()">Escolher pasta</button>
-        <button class="btn-submit" id="btnInstalarSync" onclick="instalarArquivosSync()" disabled>Instalar/atualizar →</button>
+        <button class="btn-submit" id="btnInstalarSync" onclick="instalarArquivosSync()" disabled>Instalar scripts →</button>
       </div>
       <div id="syncLog" style="margin-top:8px;font-size:11px;line-height:1.7"></div>
 
@@ -2852,7 +2852,7 @@ async function instalarArquivosSync() {
       await writable.close();
     }
 
-    _logSync('<span style="color:var(--green);font-weight:700">Arquivos instalados! Se ainda não tiver feito, falta só configurar supabase_config.json e planilha_config.json com os dados reais (ver SETUP.md).</span>');
+    _logSync('<span style="color:var(--green);font-weight:700">Scripts instalados em engine/. Para atualizar a planilha, rode o atalho ATUALIZAR_PROJETOS.</span>');
     showToast('Arquivos do sincronizador instalados na pasta.');
   } catch (e) {
     _logSync(`<span style="color:var(--red)">Erro: ${escapeHtml(e.message)}</span>`);
