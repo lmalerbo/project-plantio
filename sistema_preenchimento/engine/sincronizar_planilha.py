@@ -225,7 +225,13 @@ finally:
     wb.close()
     app.quit()
 
-os.replace(_tmp_path, SOURCE_PLANTIO)
+try:
+    os.replace(_tmp_path, SOURCE_PLANTIO)
+except OSError:
+    # Fallback para drives de rede onde os.replace pode falhar com lock SMB
+    import shutil
+    shutil.copy2(_tmp_path, SOURCE_PLANTIO)
+    os.remove(_tmp_path)
 print(f"  {len(linhas_para_escrever)} linha(s) escrita(s) e planilha salva.")
 
 print("\nSincronização concluída.")
