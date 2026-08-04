@@ -2837,7 +2837,6 @@ async function instalarArquivosSync() {
     if (permissao !== 'granted') throw new Error('permissão de escrita negada');
 
     for (const caminho of ARQUIVOS_SINCRONIZADOR) {
-      _logSync(`Copiando ${caminho}...`);
       const resp = await fetch(caminho);
       if (!resp.ok) throw new Error(`${caminho}: ${resp.status}`);
       const conteudo = await resp.blob();
@@ -2851,7 +2850,6 @@ async function instalarArquivosSync() {
       const writable = await fileHandle.createWritable();
       await writable.write(conteudo);
       await writable.close();
-      _logSync(`<span style="color:var(--green)">✓ ${caminho}</span>`);
     }
 
     _logSync('<span style="color:var(--green);font-weight:700">Arquivos instalados! Se ainda não tiver feito, falta só configurar supabase_config.json e planilha_config.json com os dados reais (ver SETUP.md).</span>');

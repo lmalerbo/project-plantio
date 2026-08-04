@@ -107,11 +107,22 @@ for row in _res.json():
         continue
     _por_bloco.setdefault(bloco_id, []).append(row)
 
+_PROJ_RANK = {'Aguard. Map.': 0, 'Pendente': 1, 'Andamento': 2, 'Ok': 3}
+
+def rollup_projeto(valores):
+    """Pior rank ganha — igual ao reduce do getBlocos no web."""
+    worst = 'Ok'
+    for v in valores:
+        p = v or 'Pendente'
+        if _PROJ_RANK.get(p, 1) < _PROJ_RANK.get(worst, 3):
+            worst = p
+    return worst
+
 blocos = {}   # bloco_id → (sist_conser, mapeamento, projeto)
 for bloco_id, rows in _por_bloco.items():
     sist_conser = rollup_sist_conser([r.get('sist_conser') for r in rows])
-    mapeamento  = rows[0].get('mapeamento') or 'Não'
-    projeto     = rows[0].get('projeto') or 'Pendente'
+    mapeamento  = 'Sim' if all(r.get('mapeamento') == 'Sim' for r in rows) else 'Não'
+    projeto     = rollup_projeto([r.get('projeto') for r in rows])
     blocos[bloco_id] = (sist_conser, mapeamento, projeto)
 print(f"  {len(blocos)} bloco(s) carregado(s) do Supabase.\n")
 
