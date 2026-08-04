@@ -203,7 +203,6 @@ print()
 if not linhas_para_escrever:
     print("Nada para escrever na planilha.")
     fechar_log(_log_fh)
-    input("\nPressione Enter para fechar...")
     sys.exit(0)
 
 # ── 3. Escreve via Excel real (preserva formatação condicional/validação) ──
@@ -247,4 +246,3 @@ print(f"  {len(linhas_para_escrever)} linha(s) escrita(s) e planilha salva.")
 
 print("\nSincronização concluída.")
 fechar_log(_log_fh)
-input("\nPressione Enter para fechar...")
