@@ -214,7 +214,7 @@ if not linhas_para_escrever:
 # de salvar direto por cima — reduz o impacto de qualquer outra contenção
 # pontual (antivírus/indexador) no exato momento da troca do arquivo.
 print("Abrindo Excel para escrever e salvar...")
-COL_Z, COL_AA, COL_AB, COL_AC = 26, 27, 28, 29   # Sist. Conser. / Mapeamento / Projeto-Mapa / data (1-based)
+COL_AA, COL_AB, COL_AC = 27, 28, 29   # Sist. Conser. / Mapeamento / Projeto-Mapa (1-based)
 
 _tmp_path = SOURCE_PLANTIO + '.sync_tmp.xlsx'
 if os.path.exists(_tmp_path):
@@ -226,9 +226,9 @@ try:
     wb = app.books.open(SOURCE_PLANTIO, password=SENHA_PLANILHA)
     ws = wb.sheets[sheet_seq]
     for linha, sist_conser, mapeamento, projeto in linhas_para_escrever:
-        ws.range((linha, COL_Z)).value  = sist_conser
-        ws.range((linha, COL_AA)).value = mapeamento
-        ws.range((linha, COL_AB)).value = projeto
+        ws.range((linha, COL_AA)).value = sist_conser
+        ws.range((linha, COL_AB)).value = mapeamento
+        ws.range((linha, COL_AC)).value = projeto
     ws.range((3, COL_AC)).value = f"Atualizado em: {datetime.date.today().strftime('%d/%m/%Y')}"
     wb.save(_tmp_path)
 finally:
