@@ -1152,7 +1152,10 @@
             <span id="formFazTitle">—</span>
             <span class="frente-tag" id="formBlocoTag">—</span>
           </div>
-          <div style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace" id="formCodTag">—</div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace" id="formCodTag">—</div>
+            <button class="btn-modal-cancel" onclick="abrirArquivosProjeto()">📎 Arquivos do projeto</button>
+          </div>
         </div>
         <div class="form-card-body">
 
@@ -1194,10 +1197,7 @@
             <!-- Submit -->
             <div class="submit-row">
               <div class="submit-info" id="submitInfo">selecione um bloco</div>
-              <div style="display:flex;gap:8px">
-                <button class="btn-modal-cancel" onclick="abrirArquivosProjeto()">📎 Arquivos do projeto</button>
-                <button class="btn-submit" id="btnSubmit" onclick="salvarBloco()" disabled>Registrar →</button>
-              </div>
+              <button class="btn-submit" id="btnSubmit" onclick="salvarBloco()" disabled>Registrar →</button>
             </div>
           </div>
 
