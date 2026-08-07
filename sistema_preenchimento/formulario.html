@@ -839,21 +839,21 @@
   /* ── Dashboard ── */
   .dash-page {
     max-width: 1280px; margin: 0 auto;
-    padding: 28px 32px; display: flex; flex-direction: column; gap: 20px;
+    padding: 16px 24px; display: flex; flex-direction: column; gap: 12px;
   }
   .dash-header {
     display: flex; align-items: baseline; justify-content: space-between;
-    padding-bottom: 16px; border-bottom: 1px solid var(--border);
+    padding-bottom: 10px; border-bottom: 1px solid var(--border);
   }
   .dash-header-title {
     font-size: 13px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
   }
   .dash-header-sub { font-size: 11px; color: var(--muted); font-family: monospace; }
 
-  .dash-kpi-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; }
+  .dash-kpi-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
   .dash-kpi-card {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: 10px; padding: 18px 20px; box-shadow: var(--shadow);
+    border-radius: 10px; padding: 12px 16px; box-shadow: var(--shadow);
     transition: border-color .2s; position: relative; overflow: hidden;
   }
   .dash-kpi-card::after {
@@ -867,10 +867,10 @@
   .dash-kpi-card:hover { border-color: var(--muted); }
   .dash-kpi-label {
     font-size: 10px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 1.5px; color: var(--muted); margin-bottom: 10px;
+    letter-spacing: 1.5px; color: var(--muted); margin-bottom: 6px;
   }
   .dash-kpi-value {
-    font-size: 30px; font-weight: 800; line-height: 1; margin-bottom: 6px;
+    font-size: 26px; font-weight: 800; line-height: 1; margin-bottom: 4px;
     letter-spacing: -0.5px;
   }
   .dash-kpi-card.green  .dash-kpi-value { color: var(--green); }
@@ -880,14 +880,14 @@
   .dash-kpi-sub { font-size: 11px; color: var(--muted); line-height: 1.4; }
 
   .dash-progress-wrap {
-    display: flex; align-items: center; gap: 14px; padding: 4px 0;
+    display: flex; align-items: center; gap: 14px; padding: 0;
   }
   .dash-progress-label {
     font-size: 10px; font-weight: 700; text-transform: uppercase;
     letter-spacing: 1.5px; color: var(--muted); white-space: nowrap;
   }
   .dash-progress-bar {
-    flex: 1; height: 10px; background: var(--surface2);
+    flex: 1; height: 8px; background: var(--surface2);
     border-radius: 99px; overflow: hidden; border: 1px solid var(--border);
   }
   .dash-progress-fill {
@@ -903,15 +903,16 @@
     font-size: 14px; font-weight: 800; color: var(--green); min-width: 42px; text-align: right;
   }
 
-  .dash-charts-flex { display: flex; gap: 20px; }
+  .dash-charts-flex { display: flex; gap: 14px; }
   .dash-charts-flex > * { flex: 1; min-width: 0; }
+  .dash-chart-card-wide { flex: 2; }
   .dash-chart-card {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: 10px; padding: 20px 22px; box-shadow: var(--shadow);
+    border-radius: 10px; padding: 14px 18px; box-shadow: var(--shadow);
   }
   .dash-chart-title {
     font-size: 10px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 1.5px; color: var(--muted); margin-bottom: 16px;
+    letter-spacing: 1.5px; color: var(--muted); margin-bottom: 10px;
   }
 
   /* ── Painel Admin (gaveta deslizante) ── */
@@ -1041,23 +1042,19 @@
       <span class="dash-progress-pct" id="dashProgressPct">0%</span>
     </div>
 
-    <!-- Ha por Mês -->
+    <!-- Gráficos -->
     <div class="dash-charts-flex">
-      <div class="dash-chart-card">
+      <div class="dash-chart-card dash-chart-card-wide">
         <div class="dash-chart-title">Ha Programado por Mês de Plantio</div>
-        <canvas id="chartMes" height="220"></canvas>
+        <canvas id="chartMes" height="160"></canvas>
       </div>
-    </div>
-
-    <!-- Linha: Ha por Usuário + Talhões que precisam Mapeamento -->
-    <div class="dash-charts-flex">
       <div class="dash-chart-card" id="chartUsuarioCard" style="display:none">
         <div class="dash-chart-title">Ha por Usuário — Log de Exportações</div>
-        <canvas id="chartUsuario" height="200"></canvas>
+        <canvas id="chartUsuario" height="160"></canvas>
       </div>
       <div class="dash-chart-card">
         <div class="dash-chart-title">Talhões Embutido — Mapeado / Falta Mapear</div>
-        <canvas id="chartMapeamento" height="200"></canvas>
+        <canvas id="chartMapeamento" height="160"></canvas>
       </div>
     </div>
 
