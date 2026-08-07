@@ -903,13 +903,17 @@
     font-size: 14px; font-weight: 800; color: var(--green); min-width: 42px; text-align: right;
   }
 
-  .dash-charts-flex { display: flex; gap: 14px; }
+  #viewDashboard { height: calc(100vh - 60px); display: flex; flex-direction: column; overflow: hidden; }
+  #viewDashboard .dash-page { flex: 1; min-height: 0; overflow: hidden; }
+  .dash-charts-flex { display: flex; gap: 14px; flex: 1; min-height: 0; }
   .dash-charts-flex > * { flex: 1; min-width: 0; }
   .dash-chart-card-wide { flex: 2; }
   .dash-chart-card {
     background: var(--surface); border: 1px solid var(--border);
     border-radius: 10px; padding: 14px 18px; box-shadow: var(--shadow);
+    display: flex; flex-direction: column; min-height: 0;
   }
+  .dash-chart-card canvas { flex: 1; min-height: 0; }
   .dash-chart-title {
     font-size: 10px; font-weight: 700; text-transform: uppercase;
     letter-spacing: 1.5px; color: var(--muted); margin-bottom: 10px;
@@ -1046,15 +1050,15 @@
     <div class="dash-charts-flex">
       <div class="dash-chart-card dash-chart-card-wide">
         <div class="dash-chart-title">Ha Programado por Mês de Plantio</div>
-        <canvas id="chartMes" height="160"></canvas>
+        <canvas id="chartMes"></canvas>
       </div>
       <div class="dash-chart-card" id="chartUsuarioCard" style="display:none">
         <div class="dash-chart-title">Ha por Usuário — Log de Exportações</div>
-        <canvas id="chartUsuario" height="160"></canvas>
+        <canvas id="chartUsuario"></canvas>
       </div>
       <div class="dash-chart-card">
         <div class="dash-chart-title">Talhões Embutido — Mapeado / Falta Mapear</div>
-        <canvas id="chartMapeamento" height="160"></canvas>
+        <canvas id="chartMapeamento"></canvas>
       </div>
     </div>
 
@@ -3692,7 +3696,7 @@ function renderDashboard() {
       ]
     },
     options: {
-      responsive: true,
+      responsive: true, maintainAspectRatio: false,
       scales: {
         x: { stacked: true, grid: { display: false },
              ticks: { font: { size: 11, weight: '600' } },
@@ -3701,7 +3705,7 @@ function renderDashboard() {
              title: { display: true, text: 'Hectares', font: { size: 10 } } }
       },
       plugins: {
-        legend: { position: 'bottom', labels: { padding: 18, font: { size: 12 }, boxWidth: 12, boxHeight: 12 } },
+        legend: { position: 'bottom', labels: { padding: 14, font: { size: 11 }, boxWidth: 12, boxHeight: 12 } },
         tooltip: { callbacks: { label: ctx => fmtTooltip(ctx.dataset.label, ctx.raw) } }
       }
     }
@@ -3724,11 +3728,11 @@ function renderDashboard() {
           borderWidth: 1.5, borderRadius: 6, borderSkipped: false }]
       },
       options: {
-        responsive: true,
+        responsive: true, maintainAspectRatio: false,
         scales: {
-          x: { grid: { display: false }, ticks: { font: { size: 13, weight: '600' } } },
-          y: { grid: { color: gridLine }, ticks: { font: { size: 11 } },
-               title: { display: true, text: 'Hectares', font: { size: 11 } } }
+          x: { grid: { display: false }, ticks: { font: { size: 12, weight: '600' } } },
+          y: { grid: { color: gridLine }, ticks: { font: { size: 10 } },
+               title: { display: true, text: 'Hectares', font: { size: 10 } } }
         },
         plugins: {
           legend: { display: false },
@@ -3753,11 +3757,11 @@ function renderDashboard() {
       }]
     },
     options: {
-      responsive: true,
+      responsive: true, maintainAspectRatio: false,
       scales: {
-        x: { grid: { display: false }, ticks: { font: { size: 13, weight: '600' } } },
-        y: { grid: { color: gridLine }, ticks: { font: { size: 11 } },
-             title: { display: true, text: 'Hectares', font: { size: 11 } } }
+        x: { grid: { display: false }, ticks: { font: { size: 12, weight: '600' } } },
+        y: { grid: { color: gridLine }, ticks: { font: { size: 10 } },
+             title: { display: true, text: 'Hectares', font: { size: 10 } } }
       },
       plugins: {
         legend: { display: false },
