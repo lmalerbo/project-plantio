@@ -1041,15 +1041,11 @@
       <span class="dash-progress-pct" id="dashProgressPct">0%</span>
     </div>
 
-    <!-- Linha: Ha por Mês + Situação de Prazo -->
+    <!-- Ha por Mês -->
     <div class="dash-charts-flex">
       <div class="dash-chart-card">
         <div class="dash-chart-title">Ha Programado por Mês de Plantio</div>
         <canvas id="chartMes" height="220"></canvas>
-      </div>
-      <div class="dash-chart-card">
-        <div class="dash-chart-title">Situação de Prazo</div>
-        <canvas id="chartPrazo" height="220"></canvas>
       </div>
     </div>
 
@@ -3557,7 +3553,7 @@ function toggleFazDetail(name, rowEl, filtMesArg, filtScArg) {
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────
-let _chartPrazo = null, _chartMes = null, _chartUsuario = null, _chartMapeamento = null;
+let _chartMes = null, _chartUsuario = null, _chartMapeamento = null;
 
 function getThemeColors() {
   const s = getComputedStyle(document.documentElement);
@@ -3710,34 +3706,6 @@ function renderDashboard() {
       plugins: {
         legend: { position: 'bottom', labels: { padding: 18, font: { size: 12 }, boxWidth: 12, boxHeight: 12 } },
         tooltip: { callbacks: { label: ctx => fmtTooltip(ctx.dataset.label, ctx.raw) } }
-      }
-    }
-  });
-
-  // ── Situação de prazo (entregue até o Mês de Plantio ou depois dele) ───────
-  if (_chartPrazo) _chartPrazo.destroy();
-  _chartPrazo = new Chart(document.getElementById('chartPrazo'), {
-    type: 'bar',
-    data: {
-      labels: ['Entregue no prazo', 'Entregue fora do prazo'],
-      datasets: [{
-        label: 'Hectares',
-        data: [d.haEntregueNoPrazo, d.haEntregueForaPrazo],
-        backgroundColor: [c.green + 'BB', c.red + 'BB'],
-        borderColor:     [c.green, c.red],
-        borderWidth: 1.5, borderRadius: 6, borderSkipped: false,
-      }]
-    },
-    options: {
-      responsive: true,
-      scales: {
-        x: { grid: { display: false }, ticks: { font: { size: 13, weight: '600' } } },
-        y: { grid: { color: gridLine }, ticks: { font: { size: 11 } },
-             title: { display: true, text: 'Hectares', font: { size: 11 } } }
-      },
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: ctx => ` ${ctx.raw.toLocaleString('pt-BR',{maximumFractionDigits:0})} ha` } }
       }
     }
   });
