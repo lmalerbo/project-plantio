@@ -903,9 +903,9 @@
     font-size: 14px; font-weight: 800; color: var(--green); min-width: 42px; text-align: right;
   }
 
-  #viewDashboard { height: calc(100vh - 60px); display: flex; flex-direction: column; overflow: hidden; }
-  #viewDashboard .dash-page { flex: 1; min-height: 0; overflow: hidden; }
-  .dash-charts-flex { display: flex; gap: 14px; flex: 1; min-height: 0; }
+  /* Altura explícita calculada do viewport — evita o loop de resize do Chart.js
+     que ocorre quando o container não tem altura definida (só flex:1 na cadeia). */
+  .dash-charts-flex { display: flex; gap: 14px; height: calc(100vh - 252px); min-height: 180px; }
   .dash-charts-flex > * { flex: 1; min-width: 0; }
   .dash-chart-card-wide { flex: 2; }
   .dash-chart-card {
@@ -913,7 +913,7 @@
     border-radius: 10px; padding: 14px 18px; box-shadow: var(--shadow);
     display: flex; flex-direction: column; min-height: 0;
   }
-  .dash-chart-card canvas { flex: 1; min-height: 0; }
+  .dash-chart-card canvas { width: 100%; flex: 1; min-height: 0; }
   .dash-chart-title {
     font-size: 10px; font-weight: 700; text-transform: uppercase;
     letter-spacing: 1.5px; color: var(--muted); margin-bottom: 10px;
