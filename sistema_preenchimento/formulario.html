@@ -1243,6 +1243,11 @@
       <select id="cFiltroSistConser" class="mes-filter-select" onchange="renderConsulta()">
         <option value="">— todos os Sist. Conser. —</option>
       </select>
+      <select id="cFiltroArquivos" class="mes-filter-select" onchange="renderConsulta()">
+        <option value="">— arquivos —</option>
+        <option value="SIM">Com arquivos</option>
+        <option value="NAO">Sem arquivos</option>
+      </select>
       <button class="faz-filter-btn" id="btnConsultaSel" onclick="toggleConsultaSelectMode()">&#9744; Selecionar</button>
       <button class="faz-filter-btn" onclick="limparFiltrosConsulta()">Limpar</button>
       <span class="consulta-filter-count" id="consultaCount"></span>
@@ -3326,6 +3331,7 @@ function limparFiltrosConsulta() {
   document.getElementById('cFiltroMes').value        = '';
   document.getElementById('cFiltroStatus').value     = '';
   document.getElementById('cFiltroSistConser').value = '';
+  document.getElementById('cFiltroArquivos').value   = '';
   renderConsulta();
 }
 
@@ -3334,6 +3340,22 @@ let _consultaPage = 0;
 let _consultaNames = [];
 let _consultaSelected = new Set();
 let _consultaSelectMode = false;
+// Set de cod_faz (strings) que já têm release com arquivos no GitHub; null = ainda não buscou.
+let _releaseTags = null;
+
+async function fetchReleaseTags() {
+  if (_releaseTags !== null) return;
+  _releaseTags = 'loading';
+  try {
+    const res = await fetch(`${RELEASE_PROXY_URL}/releases`);
+    if (!res.ok) throw new Error(res.status);
+    const tags = await res.json();
+    _releaseTags = new Set(tags.map(String));
+  } catch {
+    _releaseTags = new Set();
+  }
+  renderConsulta(_consultaPage);
+}
 
 function toggleConsultaSelectMode() {
   _consultaSelectMode = !_consultaSelectMode;
@@ -3383,15 +3405,23 @@ function renderConsulta(page) {
   if (page === undefined) { _consultaPage = 0; }
   else { _consultaPage = page; }
 
+  // Dispara fetch de releases na primeira chamada; re-renderiza quando chegar.
+  if (_releaseTags === null) fetchReleaseTags();
+
   const q           = (document.getElementById('consultaSearch')?.value || '').toLowerCase();
   const filtMes     = document.getElementById('cFiltroMes')?.value      || '';
   const filtStatus  = document.getElementById('cFiltroStatus')?.value   || '';
   const filtSc      = document.getElementById('cFiltroSistConser')?.value || '';
+  const filtArq     = document.getElementById('cFiltroArquivos')?.value  || '';
   const matchSc = t => !filtSc || (t.sistConser || 'SEM_DADO') === filtSc;
 
   document.getElementById('cFiltroMes').classList.toggle('active', !!filtMes);
   document.getElementById('cFiltroStatus').classList.toggle('active', !!filtStatus);
   document.getElementById('cFiltroSistConser').classList.toggle('active', !!filtSc);
+  document.getElementById('cFiltroArquivos')?.classList.toggle('active', !!filtArq);
+
+  const tagsReady = _releaseTags instanceof Set;
+  const temArquivos = name => tagsReady && _releaseTags.has(String(FAZENDAS[name]?.cod ?? ''));
 
   let names = q
     ? FAZENDA_NAMES.filter(n => n.toLowerCase().includes(q) || String(FAZENDAS[n].cod).includes(q))
@@ -3401,6 +3431,8 @@ function renderConsulta(page) {
     Object.values(FAZENDAS[n].talhoes).some(t =>
       (!filtMes || talYM(t) === filtMes) && matchSc(t)));
   if (filtStatus) names = names.filter(n => getFazStatus(n).status === filtStatus);
+  if (filtArq === 'SIM') names = names.filter(n => temArquivos(n));
+  if (filtArq === 'NAO') names = names.filter(n => !temArquivos(n));
 
   _consultaNames = names;
   const total = names.length;
@@ -3416,6 +3448,13 @@ function renderConsulta(page) {
     el.innerHTML = '<div style="color:var(--muted);padding:24px;text-align:center">Nenhuma fazenda encontrada.</div>';
     return;
   }
+
+  const arqCell = name => {
+    if (!tagsReady) return '<td style="color:var(--muted);font-size:11px">…</td>';
+    return temArquivos(name)
+      ? '<td><span class="faz-tag faz-tag-green" style="font-size:11px">&#10003; Sim</span></td>'
+      : '<td style="color:var(--muted);font-family:monospace">—</td>';
+  };
 
   const rows = pageNames.map(name => {
     const d = FAZENDAS[name];
@@ -3437,9 +3476,10 @@ function renderConsulta(page) {
       <td><span class="faz-tag faz-tag-${cls}">${escapeHtml(status)}</span></td>
       <td style="font-family:monospace">${conc}/${totalTals}</td>
       <td style="font-family:monospace">${haTotal.toFixed(1)} ha</td>
+      ${arqCell(name)}
     </tr>
     <tr id="cdr-${CSS.escape(name)}" style="display:none">
-      <td colspan="${_consultaSelectMode ? 7 : 6}"><div class="consulta-detail-inner" id="cdinner-${CSS.escape(name)}"></div></td>
+      <td colspan="${_consultaSelectMode ? 8 : 7}"><div class="consulta-detail-inner" id="cdinner-${CSS.escape(name)}"></div></td>
     </tr>`;
   }).join('');
 
@@ -3457,7 +3497,7 @@ function renderConsulta(page) {
       <thead><tr>
         ${_consultaSelectMode ? '<th style="width:36px"></th>' : ''}
         <th>Fazenda</th><th>Cód</th><th>Ciclo</th>
-        <th>Status</th><th>Talhões</th><th>Área</th>
+        <th>Status</th><th>Talhões</th><th>Área</th><th>Arquivos</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>

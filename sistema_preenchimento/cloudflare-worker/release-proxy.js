@@ -292,6 +292,24 @@ export default {
         return new Response(JSON.stringify(resumo), { headers: { ...corsHeaders(), 'Content-Type': 'application/json' } });
       }
 
+      if (url.pathname === '/releases' && request.method === 'GET') {
+        const tags = [];
+        let page = 1;
+        while (true) {
+          const res = await fetch(
+            `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/releases?per_page=100&page=${page}`,
+            { headers: ghHeaders(env) }
+          );
+          if (!res.ok) throw new Error(`releases pág. ${page}: ${res.status}`);
+          const data = await res.json();
+          if (!data.length) break;
+          tags.push(...data.map(r => r.tag_name));
+          if (data.length < 100) break;
+          page++;
+        }
+        return new Response(JSON.stringify(tags), { headers: { ...corsHeaders(), 'Content-Type': 'application/json' } });
+      }
+
       return new Response('Not found', { status: 404, headers: corsHeaders() });
     } catch (e) {
       return new Response(JSON.stringify({ error: e.message }), {
