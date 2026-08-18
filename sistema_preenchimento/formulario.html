@@ -406,6 +406,17 @@
   .admin-perfil-check input { cursor: pointer; accent-color: var(--accent); }
   .admin-section { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
   .admin-note { font-size: 10px; color: var(--muted); margin-top: 10px; line-height: 1.4; }
+  .gerenciar-menu-item {
+    display: flex; align-items: center; gap: 14px; width: 100%;
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; margin-bottom: 10px; cursor: pointer; text-align: left;
+    font-family: inherit; transition: border-color .2s;
+  }
+  .gerenciar-menu-item:hover { border-color: var(--accent); }
+  .gerenciar-menu-item:last-child { margin-bottom: 0; }
+  .gerenciar-menu-icon { font-size: 22px; width: 32px; text-align: center; flex-shrink: 0; }
+  .gerenciar-menu-title { font-size: 13px; font-weight: 700; color: var(--text); }
+  .gerenciar-menu-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
   .mes-filter-select {
     background: var(--panel); border: 1px solid var(--border); border-radius: 4px;
     color: var(--muted); font-size: 11px; font-family: monospace; font-weight: 700;
@@ -1019,7 +1030,7 @@
   </nav>
   <div class="header-right">
     <a href="../portal.html" class="user-badge" title="Portal de Download" style="text-decoration:none;" target="_blank" rel="noreferrer">Portal ↗</a>
-    <div class="theme-toggle" id="adminToggle" onclick="toggleAdminPanel()" title="Admin" style="display:none">&#9776;</div>
+    <div class="theme-toggle" id="btnGerenciar" onclick="abrirMenuGerenciar()" title="Gerenciar" style="display:none">&#9881;</div>
     <div class="theme-toggle notif-toggle" id="notifToggle" onclick="toggleNotifPanel()" title="Notificações" style="display:none">&#128276;<span class="notif-badge" id="notifBadge" style="display:none"></span></div>
     <div class="theme-toggle" onclick="toggleTheme()" id="themeToggle" title="Alternar tema">&#9790;</div>
     <div class="user-badge" onclick="openUserModal()" id="userBadge">Selecionar usuário</div>
@@ -1269,53 +1280,100 @@
     <span class="admin-panel-title">Admin</span>
     <button class="admin-panel-close" onclick="closeAdminPanel()" title="Fechar">&#10005;</button>
   </div>
-  <div class="admin-panel-body">
+  <div class="admin-panel-body"></div>
+</div>
 
-    <!-- Usuários -->
-    <div>
-      <div class="admin-panel-section-title">Usuários</div>
-      <div id="adminUserList" style="max-height:240px;overflow-y:auto"></div>
-      <div class="admin-section">
-        <label class="admin-label">Novo usuário</label>
-        <div style="display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap">
-          <input type="text" id="inputAdminUser" placeholder="Nome" style="flex:1;min-width:100px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:7px 9px;color:var(--text);font-family:inherit;font-size:12px">
-          <label class="admin-perfil-check"><input type="checkbox" id="chkPreenchimento" checked> Preencher</label>
-          <label class="admin-perfil-check"><input type="checkbox" id="chkDashboard" checked> Dashboard</label>
-          <label class="admin-perfil-check"><input type="checkbox" id="chkAdmin"> Admin</label>
-          <button class="btn-submit" onclick="adminAddUser()" style="padding:7px 14px;white-space:nowrap">+</button>
-        </div>
-      </div>
-      <p class="admin-note">Mudanças são salvas direto no Supabase e já valem pra todo mundo.</p>
-    </div>
-
-    <!-- Base de Talhões -->
-    <div>
-      <div class="admin-panel-section-title">Base de Talhões</div>
-      <p class="admin-note" style="margin-bottom:12px">Reimporta a demanda completa a partir da Sequência de Plantio.</p>
-      <div style="display:flex;flex-direction:column;gap:9px">
+<!-- Modal Menu Gerenciar -->
+<div class="modal-overlay" id="menuGerenciarOverlay">
+  <div class="modal">
+    <h3>⚙ Gerenciar</h3>
+    <div style="margin-top:14px">
+      <button class="gerenciar-menu-item" onclick="abrirGerenciarPerfis()">
+        <span class="gerenciar-menu-icon">👤</span>
         <div>
-          <label class="admin-label">Sequência de Plantio</label>
-          <input type="file" id="inputSeqPlantio" accept=".xlsx" onchange="atualizarBotaoDemanda()">
+          <div class="gerenciar-menu-title">Gerenciar Perfis</div>
+          <div class="gerenciar-menu-sub">Usuários e permissões de acesso</div>
         </div>
+      </button>
+      <button class="gerenciar-menu-item" onclick="abrirImportarDemanda()">
+        <span class="gerenciar-menu-icon">📊</span>
         <div>
-          <label class="admin-label">Base de Fazendas (opcional)</label>
-          <input type="file" id="inputBaseFazendas" accept=".xlsx,.xls">
+          <div class="gerenciar-menu-title">Importar Demanda</div>
+          <div class="gerenciar-menu-sub">Atualizar base de talhões a partir da Sequência de Plantio</div>
         </div>
-      </div>
-      <div style="margin-top:12px">
-        <button class="btn-submit" id="btnAtualizarDemanda" onclick="enviarAtualizacaoDemanda()" disabled>Atualizar →</button>
-      </div>
-      <div id="demandaLog" style="margin-top:10px;font-size:11px;line-height:1.7"></div>
+      </button>
+      <button class="gerenciar-menu-item" onclick="abrirSincronizar()">
+        <span class="gerenciar-menu-icon">🔄</span>
+        <div>
+          <div class="gerenciar-menu-title">Sincronizar Planilha</div>
+          <div class="gerenciar-menu-sub">Instalar scripts e sincronizar com pasta de rede</div>
+        </div>
+      </button>
     </div>
+    <div class="modal-actions">
+      <button class="btn-modal-ok" onclick="closeMenuGerenciar()">Fechar</button>
+    </div>
+  </div>
+</div>
 
-    <!-- Sincronizar Planilha -->
-    <div>
-      <div class="admin-panel-section-title">Sincronizar Planilha <span class="frente-tag">Chrome/Edge</span></div>
+<!-- Modal Gerenciar Perfis -->
+<div class="modal-overlay" id="perfisOverlay">
+  <div class="modal">
+    <h3>Gerenciar Perfis</h3>
+    <div id="adminUserList" style="max-height:240px;overflow-y:auto;margin-top:8px"></div>
+    <div class="admin-section">
+      <label class="admin-label">Novo usuário</label>
+      <div style="display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap">
+        <input type="text" id="inputAdminUser" placeholder="Nome" style="flex:1;min-width:100px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:7px 9px;color:var(--text);font-family:inherit;font-size:12px">
+        <label class="admin-perfil-check"><input type="checkbox" id="chkPreenchimento" checked> Preencher</label>
+        <label class="admin-perfil-check"><input type="checkbox" id="chkDashboard" checked> Dashboard</label>
+        <label class="admin-perfil-check"><input type="checkbox" id="chkAdmin"> Admin</label>
+        <button class="btn-submit" onclick="adminAddUser()" style="padding:7px 14px;white-space:nowrap">+</button>
+      </div>
+    </div>
+    <p class="admin-note">Mudanças são salvas direto no Supabase e já valem pra todo mundo.</p>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="voltarMenuGerenciar('perfisOverlay')">← Voltar</button>
+      <button class="btn-modal-ok" onclick="closePerfisModal()">Fechar</button>
+    </div>
+  </div>
+</div>
 
+<!-- Modal Importar Demanda -->
+<div class="modal-overlay" id="demandaOverlay">
+  <div class="modal">
+    <h3>Importar Demanda</h3>
+    <p class="admin-note" style="margin-top:4px;margin-bottom:0">Reimporta a demanda completa a partir da Sequência de Plantio.</p>
+    <div style="display:flex;flex-direction:column;gap:9px;margin-top:12px">
+      <div>
+        <label class="admin-label">Sequência de Plantio</label>
+        <input type="file" id="inputSeqPlantio" accept=".xlsx" onchange="atualizarBotaoDemanda()">
+      </div>
+      <div>
+        <label class="admin-label">Base de Fazendas (opcional)</label>
+        <input type="file" id="inputBaseFazendas" accept=".xlsx,.xls">
+      </div>
+    </div>
+    <div style="margin-top:12px">
+      <button class="btn-modal-ok" id="btnAtualizarDemanda" onclick="enviarAtualizacaoDemanda()" disabled>Atualizar →</button>
+    </div>
+    <div id="demandaLog" style="margin-top:10px;font-size:11px;line-height:1.7"></div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="voltarMenuGerenciar('demandaOverlay')">← Voltar</button>
+      <button class="btn-modal-ok" onclick="closeDemandaModal()">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Sincronizar Planilha -->
+<div class="modal-overlay" id="sincronizarOverlay">
+  <div class="modal" style="max-width:480px;width:92%">
+    <h3>Sincronizar Planilha <span class="frente-tag">Chrome/Edge</span></h3>
+    <div style="margin-top:14px">
       <label class="admin-label">Sequência de Plantio</label>
       <p class="admin-note" style="margin-bottom:8px">Instala os scripts na pasta <code>engine/</code> da planilha. Depois, rode o atalho <strong>ATUALIZAR_PROJETOS</strong> para escrever o status de volta na planilha.</p>
       <div class="admin-pasta-status" id="pastaPlanilhaStatus">Nenhuma pasta configurada.</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
         <button class="btn-outline" onclick="escolherPastaPlanilha()">Escolher pasta</button>
         <button class="btn-submit" id="btnInstalarSync" onclick="instalarArquivosSync()" disabled>Instalar scripts →</button>
       </div>
@@ -1326,13 +1384,16 @@
       <label class="admin-label">Preparo</label>
       <p class="admin-note" style="margin-bottom:8px">Lê todos os .xlsx da pasta e atualiza o Sist. Conser. no sistema.</p>
       <div class="admin-pasta-status" id="pastaPreparoStatus">Nenhuma pasta configurada.</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
         <button class="btn-outline" onclick="escolherPastaPrep()">Escolher pasta</button>
         <button class="btn-submit" id="btnCarregarPrep" onclick="carregarPrep()" disabled>Carregar e atualizar →</button>
       </div>
       <div id="prepSyncLog" style="margin-top:8px;font-size:11px;line-height:1.7"></div>
     </div>
-
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="voltarMenuGerenciar('sincronizarOverlay')">← Voltar</button>
+      <button class="btn-modal-ok" onclick="closeSincronizarModal()">Fechar</button>
+    </div>
   </div>
 </div>
 
@@ -2892,9 +2953,9 @@ function applyUserPermissions(nome) {
   document.getElementById('tabDash').style.display     = hasDash    ? '' : 'none';
   document.getElementById('tabConsulta').style.display = hasDash    ? '' : 'none';
   document.getElementById('tabWork').style.display     = hasPreench ? '' : 'none';
-  document.getElementById('adminToggle').style.display  = hasAdmin              ? '' : 'none';
-  document.getElementById('notifToggle').style.display  = (hasPreench || hasAdmin) ? '' : 'none';
-  if (!hasAdmin) closeAdminPanel();
+  document.getElementById('btnGerenciar').style.display  = hasAdmin               ? '' : 'none';
+  document.getElementById('notifToggle').style.display   = (hasPreench || hasAdmin) ? '' : 'none';
+  if (!hasAdmin) closeMenuGerenciar();
   const vd = document.getElementById('viewDashboard').style.display;
   const vc = document.getElementById('viewConsulta').style.display;
   const currentView = vd !== 'none' ? 'dashboard'
@@ -2921,6 +2982,44 @@ function closeAdminPanel() {
   document.getElementById('adminPanel')?.classList.remove('open');
   document.getElementById('adminOverlay')?.classList.remove('open');
 }
+
+// ── Menu Gerenciar ─────────────────────────────────────────────────────────
+function _abrirModalGenerico(id) { document.getElementById(id)?.classList.add('open'); }
+function _fecharModalGenerico(id) { document.getElementById(id)?.classList.remove('open'); }
+
+function abrirMenuGerenciar()  { _abrirModalGenerico('menuGerenciarOverlay'); }
+function closeMenuGerenciar()  { _fecharModalGenerico('menuGerenciarOverlay'); }
+function voltarMenuGerenciar(overlayId) {
+  _fecharModalGenerico(overlayId);
+  abrirMenuGerenciar();
+}
+
+function abrirGerenciarPerfis() {
+  closeMenuGerenciar();
+  _abrirModalGenerico('perfisOverlay');
+  renderAdminList();
+}
+function closePerfisModal() { _fecharModalGenerico('perfisOverlay'); }
+
+function abrirImportarDemanda() {
+  closeMenuGerenciar();
+  _abrirModalGenerico('demandaOverlay');
+}
+function closeDemandaModal() { _fecharModalGenerico('demandaOverlay'); }
+
+function abrirSincronizar() {
+  closeMenuGerenciar();
+  _abrirModalGenerico('sincronizarOverlay');
+  atualizarStatusPastaPlanilha();
+  atualizarStatusPastaPrep();
+}
+function closeSincronizarModal() { _fecharModalGenerico('sincronizarOverlay'); }
+
+['menuGerenciarOverlay', 'perfisOverlay', 'demandaOverlay', 'sincronizarOverlay'].forEach(id => {
+  document.getElementById(id).addEventListener('click', e => {
+    if (e.target === document.getElementById(id)) _fecharModalGenerico(id);
+  });
+});
 
 function renderUserChips() {
   const container = document.getElementById('userChips');
