@@ -27,6 +27,8 @@ const GH_OWNER = 'lmalerbo';
 const GH_REPO  = 'project-plantio';
 const ALLOWED_ORIGIN = 'https://lmalerbo.github.io';
 const SUPABASE_URL = 'https://msdkrkakuwmskoidxmxl.supabase.co';
+// Chave anon pública — já exposta em formulario.html, pode ficar hardcoded aqui.
+const SUPABASE_ANON_KEY = 'sb_publishable_eJA9YDyXdRI73lqPPYnATA_INEU3vzu';
 
 // Mesma regra de exclusão administrativa de engine/atualizar_programacao.py
 // (config.json, que deixou de existir junto com esse script).
@@ -40,6 +42,15 @@ function corsHeaders() {
   return {
     'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  };
+}
+
+// CORS aberto apenas para endpoints de relatório (somente-leitura, dado não sensível).
+function corsHeadersOpen() {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   };
 }
@@ -59,6 +70,15 @@ function sbHeaders(env, extra) {
     'Authorization': `Bearer ${env.SUPABASE_SERVICE_KEY}`,
     'Accept-Profile': 'plantio',
     'Content-Profile': 'plantio',
+  }, extra || {});
+}
+
+// Headers de leitura com anon key pública — suficiente para SELECT sem RLS especial.
+function sbAnonHeaders(extra) {
+  return Object.assign({
+    'apikey': SUPABASE_ANON_KEY,
+    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+    'Accept-Profile': 'plantio',
   }, extra || {});
 }
 
@@ -241,11 +261,12 @@ async function atualizarPreparo(env, camadas) {
 
 export default {
   async fetch(request, env) {
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { headers: corsHeaders() });
-    }
-
     const url = new URL(request.url);
+
+    if (request.method === 'OPTIONS') {
+      const h = url.pathname.startsWith('/report/') ? corsHeadersOpen() : corsHeaders();
+      return new Response(null, { headers: h });
+    }
     try {
       if (url.pathname === '/upload' && request.method === 'POST') {
         const tag      = url.searchParams.get('tag');
@@ -308,6 +329,53 @@ export default {
           page++;
         }
         return new Response(JSON.stringify(tags), { headers: { ...corsHeaders(), 'Content-Type': 'application/json' } });
+      }
+
+      if (url.pathname === '/report/fazendas' && request.method === 'GET') {
+        const res = await fetch(
+          `${SUPABASE_URL}/rest/v1/programacao?select=cod_faz,fazenda,projeto,sist_conser&order=cod_faz`,
+          { headers: sbAnonHeaders() }
+        );
+        if (!res.ok) throw new Error(`fazendas: ${res.status} ${await res.text()}`);
+        const rows = await res.json();
+
+        // Agrupa por cod_faz
+        const fazMap = new Map();
+        for (const row of rows) {
+          if (!fazMap.has(row.cod_faz)) fazMap.set(row.cod_faz, { cod_faz: row.cod_faz, fazenda: row.fazenda, _talhoes: [] });
+          fazMap.get(row.cod_faz)._talhoes.push(row);
+        }
+
+        // Mesmo cálculo de getFazStatus() do formulario.html
+        const fazendas = [];
+        for (const [, faz] of fazMap) {
+          const projetos = faz._talhoes.map(t => t.projeto);
+          let status;
+          if (projetos.every(p => p === 'Ok')) status = 'OK';
+          else if (projetos.some(p => p === 'Andamento' || p === 'Ok')) status = 'ANDAMENTO';
+          else status = 'PENDENTE';
+          const sist_conser = rollupSistConser(faz._talhoes.map(t => t.sist_conser));
+          fazendas.push({ cod_faz: faz.cod_faz, fazenda: faz.fazenda, status, sist_conser, total_talhoes: faz._talhoes.length });
+        }
+        fazendas.sort((a, b) => a.cod_faz - b.cod_faz);
+
+        return new Response(JSON.stringify(fazendas), {
+          headers: { ...corsHeadersOpen(), 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (url.pathname === '/report/talhoes' && request.method === 'GET') {
+        const res = await fetch(
+          `${SUPABASE_URL}/rest/v1/programacao` +
+          `?select=layer,cod_faz,fazenda,talhao,periodo_op,ciclo,area_ha,mes_plantio,ambiente,sist_conser,mapeamento,projeto,bloco_id` +
+          `&order=cod_faz,talhao`,
+          { headers: sbAnonHeaders() }
+        );
+        if (!res.ok) throw new Error(`talhoes: ${res.status} ${await res.text()}`);
+        const rows = await res.json();
+        return new Response(JSON.stringify(rows), {
+          headers: { ...corsHeadersOpen(), 'Content-Type': 'application/json' },
+        });
       }
 
       return new Response('Not found', { status: 404, headers: corsHeaders() });
