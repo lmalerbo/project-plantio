@@ -136,39 +136,23 @@ async function importarDemanda(env, talhoes) {
       fazenda: String(t.fazenda ?? '').trim(),
       area_ha: Number(t.area_ha) || 0,
       mes_plantio: t.mes_plantio || null,
-      ciclo: String(t.ciclo ?? '').trim(),
-      ambiente: String(t.ambiente ?? '').trim(),
       sist_conser: String(t.sist_conser ?? '').trim(),
-      seq_plantio: String(t.seq_plantio ?? '').trim(),
-      bloco_id: String(t.bloco_id ?? ''),
     });
   }
 
-  // 3. Rollup de Sist. Conser. por bloco.
-  const blocoSistConser = new Map();
-  for (const rec of porLayer.values()) {
-    const arr = blocoSistConser.get(rec.bloco_id) || [];
-    arr.push(rec.sist_conser);
-    blocoSistConser.set(rec.bloco_id, arr);
-  }
-  const blocoRollup = new Map();
-  for (const [blocoId, vals] of blocoSistConser) blocoRollup.set(blocoId, rollupSistConser(vals));
-
-  function statusInicial(blocoId, mapeamento) {
-    const sc = blocoRollup.get(blocoId) || '';
+  function statusInicial(sc, mapeamento) {
     if (!SIST_CONSER_MAPEAMENTO_AUTO.has(sc) && mapeamento !== 'Sim') return 'Aguard. Map.';
     return 'Pendente';
   }
 
-  // 4. Monta linhas finais (preserva Mapeamento/Projeto de layers já existentes,
+  // 3. Monta linhas finais (preserva Mapeamento/Projeto de layers já existentes,
   //    nunca mexe em Andamento/Ok — só recalcula Pendente/Aguard. Map.).
   let novos = 0, corrigidos = 0, mapeamentoCorrigido = 0, semArea = 0, semSistConser = 0;
   const progRows = [];
   for (const rec of porLayer.values()) {
     if (!rec.area_ha) semArea++;
     if (!rec.sist_conser) semSistConser++;
-    const scBloco = blocoRollup.get(rec.bloco_id) || '';
-    const autoSim = SIST_CONSER_MAPEAMENTO_AUTO.has(scBloco);
+    const autoSim = SIST_CONSER_MAPEAMENTO_AUTO.has(rec.sist_conser);
     const lyStr = String(rec.layer);
     let mapeamento, projeto;
     if (preserved.has(lyStr)) {
@@ -180,13 +164,13 @@ async function importarDemanda(env, talhoes) {
         mapeamentoCorrigido++;
       }
       if (projeto === 'Pendente' || projeto === 'Aguard. Map.') {
-        const novoProjeto = statusInicial(rec.bloco_id, mapeamento);
+        const novoProjeto = statusInicial(rec.sist_conser, mapeamento);
         if (novoProjeto !== projeto) corrigidos++;
         projeto = novoProjeto;
       }
     } else {
       mapeamento = autoSim ? 'Sim' : 'Não';
-      projeto = statusInicial(rec.bloco_id, mapeamento);
+      projeto = statusInicial(rec.sist_conser, mapeamento);
       novos++;
     }
     progRows.push({ ...rec, mapeamento, projeto });

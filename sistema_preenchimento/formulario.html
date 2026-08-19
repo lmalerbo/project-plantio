@@ -1343,14 +1343,14 @@
 <div class="modal-overlay" id="demandaOverlay">
   <div class="modal">
     <h3>Importar Demanda</h3>
-    <p class="admin-note" style="margin-top:4px;margin-bottom:0">Reimporta a demanda completa a partir da Sequência de Plantio.</p>
+    <p class="admin-note" style="margin-top:4px;margin-bottom:0">Reimporta a demanda completa a partir da PLANAGRI.</p>
     <div style="display:flex;flex-direction:column;gap:9px;margin-top:12px">
       <div>
-        <label class="admin-label">Sequência de Plantio</label>
-        <input type="file" id="inputSeqPlantio" accept=".xlsx" onchange="atualizarBotaoDemanda()">
+        <label class="admin-label">PLANAGRI</label>
+        <input type="file" id="inputPlanagri" accept=".xlsx" onchange="atualizarBotaoDemanda()">
       </div>
       <div>
-        <label class="admin-label">Base de Fazendas (opcional)</label>
+        <label class="admin-label">Base de Fazendas (opcional, para área)</label>
         <input type="file" id="inputBaseFazendas" accept=".xlsx,.xls">
       </div>
     </div>
@@ -2465,7 +2465,7 @@ function dataParaIsoXlsx(v) {
 }
 
 function atualizarBotaoDemanda() {
-  document.getElementById('btnAtualizarDemanda').disabled = !document.getElementById('inputSeqPlantio').files[0];
+  document.getElementById('btnAtualizarDemanda').disabled = !document.getElementById('inputPlanagri').files[0];
 }
 
 function _logDemanda(msg) {
@@ -2473,13 +2473,13 @@ function _logDemanda(msg) {
   if (el) el.insertAdjacentHTML('beforeend', `<div>${msg}</div>`);
 }
 
-// Lê as 3 planilhas e devolve os registros já explodidos/juntados por talhão,
+// Lê PLANAGRI + base de fazendas e devolve os registros por talhão,
 // prontos pra mandar pro Worker (que calcula Mapeamento/Projeto com o estado
 // atual do banco e faz o upsert).
-async function processarArquivosDemanda(fileSeq, filesPrep, fileBase) {
+async function processarArquivosDemanda(filePlanagri, fileBase) {
   const avisos = [];
 
-  // ── Base de Fazendas (área) — leitura "tipo pandas": cabeçalho é a linha 1. ──
+  // ── Base de Fazendas (área) ──────────────────────────────────────────────────
   const areaPorLayer = new Map();
   if (fileBase) {
     const wb = await lerWorkbookXlsx(fileBase);
@@ -2492,7 +2492,7 @@ async function processarArquivosDemanda(fileSeq, filesPrep, fileBase) {
       const colTal  = ['TALHAO', 'TALHOES'].map(c => colsNorm[c]).find(Boolean);
       const colArea = ['AREA_PROD', 'AREA_HA', 'HA', 'AREA'].map(c => colsNorm[c]).find(Boolean);
       if (!colCod || !colTal || !colArea) {
-        avisos.push('Base de Fazendas: colunas esperadas (COD FAZ/TALHAO/AREA) não encontradas — área ficará 0.');
+        avisos.push('Base de Fazendas: colunas (COD FAZ/TALHAO/AREA) não encontradas — área ficará 0.');
       } else {
         for (const r of rows) {
           const cod = Number(r[colCod]), tal = Number(r[colTal]), area = Number(r[colArea]);
@@ -2506,116 +2506,88 @@ async function processarArquivosDemanda(fileSeq, filesPrep, fileBase) {
     avisos.push('Nenhuma Base de Fazendas selecionada — área de cada talhão ficará 0.');
   }
 
-  // ── Preparo (Sist. Conser. por talhão) — pode ter mais de um arquivo. ──
-  const sistConserPorLayer = new Map();
-  for (const fp of filesPrep) {
-    const wb = await lerWorkbookXlsx(fp);
-    const sheetName = wb.SheetNames.find(n => normHeaderXlsx(n) === 'CONSERVACAO');
-    if (!sheetName) { avisos.push(`Aba 'CONSERVAÇÃO' não encontrada em ${fp.name} — ignorada.`); continue; }
-    const sheet = wb.Sheets[sheetName];
-    const { headerRowIdx, hmap } = acharHeaderXlsx(sheet, ['SECAO', 'TALHAO', 'SISTEMA DE CONSERVACAO']);
-    if (headerRowIdx === -1) { avisos.push(`Cabeçalho (Seção/Talhão/Sistema de Conservação) não encontrado em ${fp.name} — ignorada.`); continue; }
-    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: true });
-    const idxCod = hmap['SECAO'], idxTal = hmap['TALHAO'], idxSc = hmap['SISTEMA DE CONSERVACAO'];
-    for (let i = headerRowIdx + 1; i < rows.length; i++) {
-      const row = rows[i] || [];
-      const codRaw = row[idxCod], talRaw = row[idxTal], scRaw = row[idxSc];
-      if (codRaw == null || talRaw == null) continue;
-      const cod = Number(codRaw), tal = Number(talRaw);
-      if (!Number.isFinite(cod) || !Number.isFinite(tal)) continue;
-      sistConserPorLayer.set(`${Math.trunc(cod)}|${Math.trunc(tal)}`, normalizaSistConser(scRaw));
-    }
+  // ── PLANAGRI (um talhão por linha) ──────────────────────────────────────────
+  // Índices 0-based: A=0, B=1, C=2, D=3, O=14, AF=31, CA=78
+  const COL_LAYER = 0, COL_COD = 1, COL_SECAO = 2, COL_TALHAO = 3;
+  const COL_PLAN = 14, COL_SC = 31, COL_MES = 78;
+
+  const wbP = await lerWorkbookXlsx(filePlanagri);
+  const sheetName = wbP.SheetNames.find(n => n.trim() === 'Planagri');
+  if (!sheetName) throw new Error(`Aba 'Planagri' não encontrada. Abas: ${wbP.SheetNames.map(n => JSON.stringify(n)).join(', ')}`);
+  const rowsP = XLSX.utils.sheet_to_json(wbP.Sheets[sheetName], { header: 1, defval: null, raw: true });
+
+  // Encontra a linha do cabeçalho procurando 'LAYER' na col A (normalmente linha 5, 0-based).
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(rowsP.length, 15); i++) {
+    if (normHeaderXlsx((rowsP[i] || [])[COL_LAYER]) === 'LAYER') { headerIdx = i; break; }
   }
+  if (headerIdx === -1) throw new Error("Cabeçalho 'LAYER' não encontrado na aba Planagri (verificar estrutura do arquivo).");
 
-  // ── Sequência de Plantio (demanda, blocos de talhões). ──
-  const wbSeq = await lerWorkbookXlsx(fileSeq);
-  const sheetSeqName = wbSeq.SheetNames.find(n => normHeaderXlsx(n) === 'SEQUENCIA');
-  if (!sheetSeqName) throw new Error(`Aba 'Sequencia' não encontrada. Abas disponíveis: ${wbSeq.SheetNames.join(', ')}`);
-  const sheetSeq = wbSeq.Sheets[sheetSeqName];
-  const LIMITE_COL = 28; // coluna AB — colunas além dela (bloco "MUDA") são fora de escopo
-  const { headerRowIdx: hrSeq, hmap: hmapSeq } = acharHeaderXlsx(sheetSeq, ['MES DE PLANTIO', 'CODIGO', 'SECAO', 'TALHOES'], 10, LIMITE_COL);
-  if (hrSeq === -1) throw new Error("Cabeçalho (Mês de Plantio/Código/Seção/Talhões) não encontrado na aba 'Sequencia'.");
-
-  const rowsSeq = XLSX.utils.sheet_to_json(sheetSeq, { header: 1, defval: null, raw: true });
-  const idxMes = hmapSeq['MES DE PLANTIO'], idxCic = hmapSeq['CICLO'], idxCod = hmapSeq['CODIGO'],
-        idxSec = hmapSeq['SECAO'], idxTal = hmapSeq['TALHOES'], idxAmb = hmapSeq['AMBIENTE'],
-        idxSeqP = hmapSeq['SEQUENCIA PLANTIO'];
-
+  let nLinhas = 0, nAdmin = 0, nIgnoradas = 0, nFiltradas = 0;
   const exploded = [];
-  let nLinhas = 0, nAdmin = 0, nIgnoradas = 0, nFalhaTalhao = 0;
-  for (let i = hrSeq + 1; i < rowsSeq.length; i++) {
-    const row = (rowsSeq[i] || []).slice(0, LIMITE_COL);
-    const codRaw = idxCod != null ? row[idxCod] : null;
-    const secRaw = idxSec != null ? row[idxSec] : null;
-    const talRaw = idxTal != null ? row[idxTal] : null;
-    if (codRaw == null || secRaw == null || talRaw == null) {
-      if (codRaw != null || secRaw != null || talRaw != null) nIgnoradas++;
-      continue;
-    }
-    const codFaz = Number(codRaw);
-    if (!Number.isFinite(codFaz)) { nIgnoradas++; continue; }
-    if (String(Math.trunc(codFaz)).startsWith(CODFAZ_EXCLUIR_PREFIXO)) { nAdmin++; continue; }
+  for (let i = headerIdx + 1; i < rowsP.length; i++) {
+    const row = rowsP[i] || [];
+    const layerRaw = row[COL_LAYER];
+    if (layerRaw == null || String(layerRaw).trim() === '' || String(layerRaw).trim() === '_') { nIgnoradas++; continue; }
+    if (String(layerRaw).trim().startsWith('_')) { nIgnoradas++; continue; }
 
-    const talhoes = parseTalhoesXlsx(talRaw);
-    if (!talhoes.length) {
-      avisos.push(`COD FAZ ${codFaz}: não foi possível interpretar TALHÕES = ${JSON.stringify(talRaw)} — linha ignorada.`);
-      nFalhaTalhao++;
-      continue;
-    }
+    const planRaw = row[COL_PLAN];
+    if (String(planRaw || '').trim().toUpperCase() !== 'LIB') { nFiltradas++; continue; }
+
+    const codRaw = row[COL_COD], talRaw = row[COL_TALHAO];
+    if (codRaw == null || talRaw == null) { nIgnoradas++; continue; }
+    const codFaz = Math.trunc(Number(codRaw)), talhao = Math.trunc(Number(talRaw));
+    if (!Number.isFinite(codFaz) || !Number.isFinite(talhao)) { nIgnoradas++; continue; }
+    if (String(codFaz).startsWith(CODFAZ_EXCLUIR_PREFIXO)) { nAdmin++; continue; }
+
+    exploded.push({
+      cod_faz: codFaz,
+      fazenda: String(row[COL_SECAO] ?? '').trim(),
+      talhao,
+      sist_conser: normalizaSistConser(row[COL_SC]),
+      mes_plantio: dataParaIsoXlsx(row[COL_MES]),
+    });
     nLinhas++;
-    const fazenda = String(secRaw).trim();
-    const mesPlantio = idxMes != null ? dataParaIsoXlsx(row[idxMes]) : null;
-    const ciclo = (idxCic != null && row[idxCic] != null) ? String(row[idxCic]).trim() : '';
-    const ambiente = (idxAmb != null && row[idxAmb]) ? String(row[idxAmb]).trim() : '';
-    const seqPlantio = (idxSeqP != null && row[idxSeqP]) ? String(row[idxSeqP]).trim() : '';
-    const blocoId = `${Math.trunc(codFaz)}|${mesPlantio}|${String(talRaw).trim()}`;
-
-    for (const talhao of talhoes) {
-      exploded.push({ cod_faz: Math.trunc(codFaz), fazenda, talhao, mes_plantio: mesPlantio, ciclo, ambiente, seq_plantio: seqPlantio, bloco_id: blocoId });
-    }
   }
 
-  // ── Junta tudo por LAYER (último ganha em caso de talhão duplicado). ──
-  let semArea = 0, semSistConser = 0;
+  // ── Junta por LAYER (último ganha em caso de duplicata) ─────────────────────
+  let semArea = 0;
   const porLayer = new Map();
   for (const r of exploded) {
     const layer = Number(`${r.cod_faz}${String(r.talhao).padStart(3, '0')}`);
     const key = `${r.cod_faz}|${r.talhao}`;
-    const areaHa = areaPorLayer.has(key) ? areaPorLayer.get(key) : 0;
+    const areaHa = areaPorLayer.get(key) || 0;
     if (!areaHa) semArea++;
-    const temSc = sistConserPorLayer.has(key);
-    const sistConser = temSc ? sistConserPorLayer.get(key) : '';
-    if (!temSc) semSistConser++;
     const periodoOp = r.mes_plantio ? Number(r.mes_plantio.split('-')[1]) : null;
     porLayer.set(layer, {
-      layer, periodo_op: periodoOp, cod_faz: r.cod_faz, fazenda: r.fazenda, talhao: r.talhao,
-      area_ha: areaHa, mes_plantio: r.mes_plantio, ciclo: r.ciclo, ambiente: r.ambiente,
-      sist_conser: sistConser, seq_plantio: r.seq_plantio || '', bloco_id: r.bloco_id,
+      layer, cod_faz: r.cod_faz, fazenda: r.fazenda, talhao: r.talhao,
+      area_ha: areaHa, mes_plantio: r.mes_plantio, periodo_op: periodoOp,
+      sist_conser: r.sist_conser,
     });
   }
 
   return {
     talhoes: [...porLayer.values()],
-    resumo: { nLinhas, nExplodidos: exploded.length, nAdmin, nIgnoradas, nFalhaTalhao, semArea, semSistConser, avisos },
+    resumo: { nLinhas, nAdmin, nIgnoradas, nFiltradas, semArea, avisos },
   };
 }
 
 async function enviarAtualizacaoDemanda() {
-  const fileSeq  = document.getElementById('inputSeqPlantio').files[0];
-  const fileBase = document.getElementById('inputBaseFazendas').files[0] || null;
+  const filePlanagri = document.getElementById('inputPlanagri').files[0];
+  const fileBase     = document.getElementById('inputBaseFazendas').files[0] || null;
   const btn = document.getElementById('btnAtualizarDemanda');
   const log = document.getElementById('demandaLog');
   if (log) log.innerHTML = '';
-  if (!fileSeq) return;
+  if (!filePlanagri) return;
 
   btn.disabled = true;
   try {
-    _logDemanda('Lendo planilha...');
-    const { talhoes, resumo } = await processarArquivosDemanda(fileSeq, [], fileBase);
-    _logDemanda(`${resumo.nLinhas} bloco(s), ${resumo.nExplodidos} talhão(ões).`);
-    if (resumo.nAdmin)       _logDemanda(`Filtro COD FAZ ${CODFAZ_EXCLUIR_PREFIXO}x: ${resumo.nAdmin} excluído(s).`);
-    if (resumo.nIgnoradas)   _logDemanda(`${resumo.nIgnoradas} linha(s) incompleta(s) ignorada(s).`);
-    if (resumo.nFalhaTalhao) _logDemanda(`${resumo.nFalhaTalhao} linha(s) com TALHÕES não interpretável.`);
+    _logDemanda('Lendo PLANAGRI...');
+    const { talhoes, resumo } = await processarArquivosDemanda(filePlanagri, fileBase);
+    _logDemanda(`${resumo.nLinhas} talhão(ões) LIB lidos.`);
+    if (resumo.nAdmin)    _logDemanda(`Filtro COD FAZ ${CODFAZ_EXCLUIR_PREFIXO}x: ${resumo.nAdmin} excluído(s).`);
+    if (resumo.nFiltradas) _logDemanda(`${resumo.nFiltradas} linha(s) sem LIB (não planejadas) ignorada(s).`);
+    if (resumo.nIgnoradas) _logDemanda(`${resumo.nIgnoradas} linha(s) inválidas/vazias ignorada(s).`);
     resumo.avisos.forEach(a => _logDemanda(`<span style="color:var(--accent)">⚠ ${escapeHtml(a)}</span>`));
     if (!talhoes.length) {
       _logDemanda('<span style="color:var(--red)">Nenhum talhão encontrado — confira a planilha.</span>');
@@ -2632,8 +2604,8 @@ async function enviarAtualizacaoDemanda() {
     _logDemanda(`<span style="color:var(--green);font-weight:700">Demanda atualizada!</span> ${r.totalEnviado} registro(s) (novos: ${r.novos}, preservados: ${r.preservados}).`);
     if (r.corrigidos)          _logDemanda(`Status corrigido: ${r.corrigidos}.`);
     if (r.mapeamentoCorrigido) _logDemanda(`Mapeamento auto-corrigido p/ Sim: ${r.mapeamentoCorrigido}.`);
-    if (r.semArea)             _logDemanda(`⚠ ${r.semArea} talhão(ões) sem área.`);
-    if (r.semSistConser)       _logDemanda(`⚠ ${r.semSistConser} talhão(ões) sem Sist. Conser. — use Sincronizar → Preparo.`);
+    if (r.semArea)             _logDemanda(`⚠ ${r.semArea} talhão(ões) sem área — selecione a Base de Fazendas.`);
+    if (r.semSistConser)       _logDemanda(`⚠ ${r.semSistConser} talhão(ões) sem Sist. Conser. na PLANAGRI.`);
     if (r.removidos && r.removidos.length) _logDemanda(`⚠ ${r.removidos.length} LAYER(s) preenchidos sumiram da nova base.`);
     showToast('Demanda atualizada com sucesso.');
     await carregarDadosSupabase();
