@@ -1177,7 +1177,6 @@
           </div>
           <div style="display:flex;align-items:center;gap:12px">
             <div style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace" id="formCodTag">—</div>
-            <button class="btn-modal-cancel" onclick="abrirArquivosProjeto()">📎 Arquivos do projeto</button>
           </div>
         </div>
         <div class="form-card-body">
@@ -1616,6 +1615,8 @@ let currentBlocoId = null;
 let records        = [];   // log de alterações desta sessão (só para exibição em "Registros do dia")
 let _arquivosEsperados = [];
 let _arquivosSelecionados = [];
+let _onUploadSuccess = null;
+let _mapaFile = null;
 // blocoId → JSON {mapeamento,projeto} do último registro salvo nesta sessão — evita
 // duplicar log_exportacoes ao clicar "Registrar" de novo sem ter mudado nada.
 let _blocoUltimoSalvo = {};
@@ -2362,8 +2363,103 @@ async function enviarArquivosProjeto() {
   if (!erro) {
     _logArquivos('<span style="color:var(--green);font-weight:700">Todos os arquivos enviados com sucesso!</span>');
     document.getElementById('btnFecharConsolidar').disabled = false;
+    if (_onUploadSuccess) {
+      try { await _onUploadSuccess(); } catch (e) { _logArquivos(`<span style="color:var(--red)">Erro ao avançar etapa: ${escapeHtml(e.message)}</span>`); }
+      _onUploadSuccess = null;
+    }
   } else {
     btn.disabled = false;
+  }
+}
+
+
+// ── Upload contextual por etapa ────────────────────────────────────────────
+
+async function _avancarEtapaFazenda(novoStatus) {
+  if (!currentFaz || !currentUser) return;
+  const tals = Object.values(FAZENDAS[currentFaz]?.talhoes || {});
+  const layers = tals.map(t => t.layer).filter(Boolean);
+  if (!layers.length) return;
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/registrar_bloco`, {
+    method: 'POST',
+    headers: _sbHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ p_layers: layers.map(Number), p_mapeamento: 'Sim', p_projeto: novoStatus, p_usuario: currentUser }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  tals.forEach(t => { t.projeto = novoStatus; });
+  renderEtapa(currentFaz);
+  renderFazendas(currentNames);
+  updateStats();
+}
+
+function abrirUploadExportacao() {
+  if (!currentFaz) return;
+  const cod = String(FAZENDAS[currentFaz]?.cod ?? '');
+  _arquivosEsperados = [{ cod, faz: currentFaz, suf: 'Exp0', ext: 'zip', opcional: false,
+    nome: `${cod}_*_Exp0.zip`, ok: false, matched: null }];
+  _arquivosSelecionados = [];
+  _onUploadSuccess = async () => { await _avancarEtapaFazenda('Ag. Mapa'); };
+  _abrirConsolidarModal(`Exportação — ${currentFaz}`, `
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
+      Selecione o ZIP da exportação. Padrão: <code>${escapeHtml(cod)}_*_Exp{N}.zip</code>
+    </div>
+    <ul id="checklistArquivos" style="list-style:none;padding:0;margin:0 0 8px;font-size:11px;line-height:1.9">
+      ${_arquivosEsperados.map(a => `<li data-nome="${escapeHtml(a.nome)}">⬜ ${escapeHtml(a.nome)}</li>`).join('')}
+    </ul>
+    <input type="file" id="inputArquivosProjeto" accept=".zip" onchange="_adicionarArquivoProjeto(this)">
+    <button class="btn-modal-cancel" style="margin-left:8px" id="btnEnviarArquivos" onclick="enviarArquivosProjeto()" disabled>Enviar</button>
+    <div id="uploadArquivosLog" style="margin-top:8px;font-size:11px;line-height:1.8"></div>`);
+}
+
+const RE_MAPA_PLANTIO = /^(\d+)_.+_MapaPlantio\.pdf$/i;
+
+function _adicionarMapaPlantio(input, cod) {
+  const file = input.files[0];
+  input.value = '';
+  const log = document.getElementById('uploadArquivosLog');
+  if (log) log.innerHTML = '';
+  if (!file) return;
+  const m = file.name.match(RE_MAPA_PLANTIO);
+  if (!m || m[1] !== cod) {
+    if (log) log.innerHTML = `<span style="color:var(--red)">Nome fora do padrão (esperado: ${escapeHtml(cod)}_*_MapaPlantio.pdf)</span>`;
+    return;
+  }
+  _mapaFile = file;
+  const status = document.getElementById('mapaPlantioStatus');
+  if (status) { status.textContent = `✅ ${file.name}`; status.style.color = 'var(--green)'; }
+  const btn = document.getElementById('btnEnviarArquivos');
+  if (btn) btn.disabled = false;
+}
+
+function abrirUploadMapaPlantio() {
+  if (!currentFaz) return;
+  const cod = String(FAZENDAS[currentFaz]?.cod ?? '');
+  _mapaFile = null;
+  _onUploadSuccess = async () => { await _avancarEtapaFazenda('Ok'); };
+  _abrirConsolidarModal(`Mapa Plantio — ${currentFaz}`, `
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
+      Selecione o PDF do Mapa de Plantio. Padrão: <code>${escapeHtml(cod)}_*_MapaPlantio.pdf</code>
+    </div>
+    <div id="mapaPlantioStatus" style="font-size:11px;margin-bottom:8px;line-height:1.9">⬜ ${escapeHtml(cod)}_*_MapaPlantio.pdf</div>
+    <input type="file" id="inputMapaPlantio" accept=".pdf" onchange="_adicionarMapaPlantio(this, '${cod.replace(/'/g, "\\'")}')">
+    <button class="btn-modal-cancel" style="margin-left:8px" id="btnEnviarArquivos" onclick="enviarMapaPlantio()" disabled>Enviar</button>
+    <div id="uploadArquivosLog" style="margin-top:8px;font-size:11px;line-height:1.8"></div>`);
+}
+
+async function enviarMapaPlantio() {
+  if (!_mapaFile || !currentFaz) return;
+  const cod = String(FAZENDAS[currentFaz]?.cod ?? '');
+  const btn = document.getElementById('btnEnviarArquivos');
+  if (btn) btn.disabled = true;
+  try {
+    _logArquivos(`Enviando ${_mapaFile.name}...`);
+    await _releaseUploadAsset(cod, cod, _mapaFile);
+    _logArquivos(`<span style="color:var(--green)">✓ ${escapeHtml(_mapaFile.name)} enviado</span>`);
+    document.getElementById('btnFecharConsolidar').disabled = false;
+    if (_onUploadSuccess) { try { await _onUploadSuccess(); } catch (e) { _logArquivos(`<span style="color:var(--red)">Erro ao avançar etapa: ${escapeHtml(e.message)}</span>`); } _onUploadSuccess = null; }
+  } catch (e) {
+    _logArquivos(`<span style="color:var(--red)">✗ ${escapeHtml(e.message)}</span>`);
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -3242,12 +3338,12 @@ function renderEtapa(name) {
       <button class="btn-submit" id="btnIniciar" onclick="iniciarProjeto()" ${!ok ? 'disabled' : ''}>Iniciar Projeto →</button>`;
   } else if (etapa === 'Andamento') {
     el.innerHTML = `
-      <div class="submit-info">Projeto em andamento — faça upload da exportação ao concluir.</div>
-      <button class="btn-submit" onclick="abrirArquivosProjeto()">📎 Upload Exportação →</button>`;
+      <div class="submit-info">Projeto em andamento — faça upload do ZIP da exportação ao concluir.</div>
+      <button class="btn-submit" onclick="abrirUploadExportacao()">📎 Upload Exportação (ZIP) →</button>`;
   } else if (etapa === 'Ag. Mapa') {
     el.innerHTML = `
-      <div class="submit-info">Exportação enviada — aguardando Mapa Plantio (PDF).</div>
-      <button class="btn-submit" onclick="abrirArquivosProjeto()">📎 Upload Mapa Plantio →</button>`;
+      <div class="submit-info">Exportação enviada — faça upload do Mapa Plantio (PDF) para concluir.</div>
+      <button class="btn-submit" onclick="abrirUploadMapaPlantio()">📎 Upload Mapa Plantio (PDF) →</button>`;
   } else if (etapa === 'Concluído') {
     el.innerHTML = `<div class="submit-info" style="color:var(--green)">✓ Projeto concluído.</div>`;
   }
