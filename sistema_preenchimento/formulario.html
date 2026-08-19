@@ -249,6 +249,21 @@
   }
   .form-card-body { padding: 18px; }
 
+  /* ── Stepper de etapas ── */
+  .etapa-steps { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 16px; }
+  .etapa-item {
+    font-size: 10px; font-weight: 500; padding: 3px 9px;
+    border-radius: 12px; border: 1px solid var(--border);
+    color: var(--muted); white-space: nowrap;
+  }
+  .etapa-item.active {
+    color: var(--accent); border-color: var(--accent);
+    background: rgba(200,150,12,.08); font-weight: 700;
+  }
+  .etapa-item.done { color: var(--green); border-color: var(--green); }
+  .etapa-arrow { color: var(--border); font-size: 13px; }
+  .etapa-info-row { font-size: 12px; color: var(--muted); margin: 8px 0 14px; line-height: 1.8; }
+
   /* ── Cobertura toggle ── */
   .cob-toggle { display: flex; gap: 8px; margin-bottom: 18px; }
   .cob-btn {
@@ -1167,47 +1182,20 @@
         </div>
         <div class="form-card-body">
 
-          <!-- Blocos da fazenda (cada bloco = grupo de talhões da Sequência de Plantio) -->
+          <!-- Stepper de etapas da fazenda -->
+          <div id="etapaSteps" class="etapa-steps"></div>
+
+          <!-- Talhões (leitura) -->
           <div class="talhoes-section">
-            <div class="talhoes-label"><span>Blocos</span></div>
-            <div id="blocosList" style="display:flex;flex-direction:column;gap:8px"></div>
+            <div class="talhoes-label"><span>Talhões</span></div>
+            <div class="talhoes-grid" id="etapaTalhoesGrid"></div>
           </div>
 
-          <!-- Painel do bloco selecionado -->
-          <div id="blocoPanel" style="display:none">
-            <div class="talhoes-section">
-              <div class="talhoes-label"><span>Talhões do bloco</span></div>
-              <div class="talhoes-grid" id="talhoesGrid"></div>
-            </div>
+          <!-- Info: sist. conser., mapeamento, prazo -->
+          <div id="etapaInfoRow" class="etapa-info-row"></div>
 
-            <div class="fields-row">
-              <div class="field-group">
-                <label>Mapeamento</label>
-                <div class="cob-toggle">
-                  <button class="cob-btn" id="btnMapNao" onclick="setMapeamento('Não')">Não</button>
-                  <button class="cob-btn" id="btnMapSim" onclick="setMapeamento('Sim')">Sim</button>
-                </div>
-              </div>
-              <div class="field-group">
-                <label>Projeto</label>
-                <select id="selProjeto">
-                  <option value="Aguard. Map.">Aguard. Map.</option>
-                  <option value="Pendente">Pendente</option>
-                  <option value="Andamento">Andamento</option>
-                  <option value="Ok">Ok</option>
-                </select>
-              </div>
-            </div>
-            <div id="gatingInfo" style="display:none;font-size:11px;color:var(--accent);margin-bottom:10px">
-              ⚠ Sist. Conser. exige Mapeamento = Sim antes do Projeto poder avançar.
-            </div>
-
-            <!-- Submit -->
-            <div class="submit-row">
-              <div class="submit-info" id="submitInfo">selecione um bloco</div>
-              <button class="btn-submit" id="btnSubmit" onclick="salvarBloco()" disabled>Registrar →</button>
-            </div>
-          </div>
+          <!-- Ação da etapa atual -->
+          <div class="submit-row" id="etapaAcao"></div>
 
         </div>
       </div>
@@ -1917,14 +1905,13 @@ function selectFazenda(name) {
 
   document.getElementById('placeholder').style.display = 'none';
   document.getElementById('formArea').style.display = 'block';
-  document.getElementById('blocoPanel').style.display = 'none';
 
   const d = FAZENDAS[name];
   document.getElementById('formFazTitle').textContent = name;
   document.getElementById('formBlocoTag').textContent = '—';
   document.getElementById('formCodTag').textContent = 'COD ' + d.cod;
 
-  renderBlocos();
+  renderEtapa(name);
 }
 
 function clearFazendaSelection() {
@@ -1934,7 +1921,6 @@ function clearFazendaSelection() {
   document.getElementById('fazSelectedBadge').style.display = 'none';
   document.getElementById('btnClearFaz').style.display = 'none';
   document.getElementById('formArea').style.display = 'none';
-  document.getElementById('blocoPanel').style.display = 'none';
   document.getElementById('placeholder').style.display = '';
   document.getElementById('searchFaz').value = '';
   renderFazendas(currentNames);
@@ -2055,9 +2041,9 @@ function motivoBloqueioProjeto(sistConser, mapeamento) {
 
 function aplicarGatingProjeto(sistConser) {
   _blocoSistConser = sistConser;
-  const motivo = motivoBloqueioProjeto(sistConser, _blocoMapeamento);
   const sel = document.getElementById('selProjeto');
-
+  if (!sel) return;
+  const motivo = motivoBloqueioProjeto(sistConser, _blocoMapeamento);
   if (motivo === 'aguardando_mapeamento') {
     [...sel.options].forEach(opt => { opt.disabled = opt.value !== 'Aguard. Map.'; });
     if (sel.value !== 'Aguard. Map.') sel.value = 'Aguard. Map.';
@@ -2065,17 +2051,11 @@ function aplicarGatingProjeto(sistConser) {
     [...sel.options].forEach(opt => { opt.disabled = opt.value === 'Aguard. Map.'; });
     if (sel.value === 'Aguard. Map.') sel.value = 'Pendente';
   }
-
   const info = document.getElementById('gatingInfo');
-  if (motivo) {
-    info.style.display = '';
-    info.textContent = '⚠ Sist. Conser. exige Mapeamento = Sim antes do Projeto poder avançar.';
-  } else {
-    info.style.display = 'none';
-  }
+  if (info) { info.style.display = motivo ? '' : 'none'; }
 }
 
-document.getElementById('selProjeto').onchange = updateSalvarBtn;
+{ const _sp = document.getElementById('selProjeto'); if (_sp) _sp.onchange = updateSalvarBtn; }
 
 // ── Registrar ─────────────────────────────────────────────────────────────
 function updateSalvarBtn() {
@@ -3193,16 +3173,112 @@ function setView(name) {
 function getFazStatus(name) {
   const tals = Object.values(FAZENDAS[name]?.talhoes || {});
   if (!tals.length) return { status: '—', cls: 'muted', ciclo: '—', sistConser: '' };
-  const total = tals.length;
-  const ok    = tals.filter(t => t.projeto === 'Ok').length;
-  const algum = tals.some(t => t.projeto === 'Andamento' || t.projeto === 'Ok');
   const ciclo = tals.find(t => t.ciclo)?.ciclo || '—';
   const sistConser = rollupSistConser(tals);
   let status, cls;
-  if (ok === total) { status = 'OK';        cls = 'green';  }
-  else if (algum)    { status = 'ANDAMENTO'; cls = 'accent'; }
-  else               { status = 'PENDENTE';  cls = 'blue';   }
+  const etapa = getFazEtapa(name);
+  if (etapa === 'Concluído')       { status = 'OK';        cls = 'green';  }
+  else if (etapa === 'Ag. Mapa')   { status = 'AG. MAPA';  cls = 'blue';   }
+  else if (etapa === 'Andamento')  { status = 'ANDAMENTO'; cls = 'accent'; }
+  else if (etapa === 'Pendente')   { status = 'PENDENTE';  cls = 'blue';   }
+  else                             { status = 'AG. MAP.';  cls = 'muted';  }
   return { status, cls, ciclo, sistConser };
+}
+
+// ── Pipeline de etapas por fazenda ────────────────────────────────────────
+const ETAPAS      = ['Ag. Mapeamento', 'Pendente', 'Andamento', 'Ag. Mapa', 'Concluído'];
+const ETAPA_RANK  = { 'Aguard. Map.': 0, 'Pendente': 1, 'Andamento': 2, 'Ag. Mapa': 3, 'Ok': 4 };
+const DB_TO_ETAPA = { 'Aguard. Map.': 'Ag. Mapeamento', 'Pendente': 'Pendente', 'Andamento': 'Andamento', 'Ag. Mapa': 'Ag. Mapa', 'Ok': 'Concluído' };
+
+function getFazEtapa(name) {
+  const tals = Object.values(FAZENDAS[name]?.talhoes || {});
+  if (!tals.length) return 'Pendente';
+  const worstRank = Math.min(...tals.map(t => ETAPA_RANK[t.projeto] ?? 1));
+  const dbVal = Object.keys(ETAPA_RANK).find(k => ETAPA_RANK[k] === worstRank) || 'Pendente';
+  return DB_TO_ETAPA[dbVal] || 'Pendente';
+}
+
+function renderEtapa(name) {
+  if (!name) return;
+  const d    = FAZENDAS[name];
+  // inclui o número do talhão como propriedade (a chave do objeto não vem em Object.values)
+  const tals = Object.entries(d?.talhoes || {}).map(([k, v]) => ({ talhao: +k, ...v }));
+  const etapa = getFazEtapa(name);
+  const etapaIdx = ETAPAS.indexOf(etapa);
+
+  // Stepper
+  const stepsHtml = ETAPAS.map((e, i) => {
+    const state = i < etapaIdx ? 'done' : i === etapaIdx ? 'active' : '';
+    const arrow = i < ETAPAS.length - 1 ? `<span class="etapa-arrow">›</span>` : '';
+    return `<span class="etapa-item ${state}">${e}</span>${arrow}`;
+  }).join('');
+  document.getElementById('etapaSteps').innerHTML = stepsHtml;
+
+  // Talhões (só número, ordenado)
+  const talsSorted = [...tals].sort((a, b) => a.talhao - b.talhao);
+  document.getElementById('etapaTalhoesGrid').innerHTML =
+    talsSorted.map(t => `<div class="tal-chip selected disabled">${t.talhao}</div>`).join('');
+
+  // Info row
+  const sc      = rollupSistConser(tals);
+  const mapSim  = tals.filter(t => t.mapeamento === 'Sim').length;
+  const mes     = tals.find(t => t.mesPlantio)?.mesPlantio || null;
+  const totalHa = tals.reduce((s, t) => s + (t.ha || 0), 0);
+  document.getElementById('etapaInfoRow').innerHTML = [
+    sc      ? `Sist.Conser.: <strong>${escapeHtml(sc)}</strong>` : '',
+    `Mapeamento: <strong>${mapSim}/${tals.length} Sim</strong>`,
+    mes     ? `Plantio: <strong>${fmtMesPlantio(mes)}</strong>` : '',
+    totalHa ? `${totalHa.toFixed(1)} ha` : '',
+  ].filter(Boolean).join(' &nbsp;·&nbsp; ');
+
+  // Ação
+  const el = document.getElementById('etapaAcao');
+  if (etapa === 'Ag. Mapeamento') {
+    el.innerHTML = `<div class="submit-info" style="color:var(--accent)">⚠ Aguardando mapeamento — sincronize o Preparo ou ajuste manualmente.</div>`;
+  } else if (etapa === 'Pendente') {
+    const ok = !!currentUser;
+    el.innerHTML = `
+      <div class="submit-info" id="submitInfo">${ok ? `${tals.length} talhão(ões) prontos para iniciar` : '⚠ selecione seu usuário'}</div>
+      <button class="btn-submit" id="btnIniciar" onclick="iniciarProjeto()" ${!ok ? 'disabled' : ''}>Iniciar Projeto →</button>`;
+  } else if (etapa === 'Andamento') {
+    el.innerHTML = `
+      <div class="submit-info">Projeto em andamento — faça upload da exportação ao concluir.</div>
+      <button class="btn-submit" onclick="abrirArquivosProjeto()">📎 Upload Exportação →</button>`;
+  } else if (etapa === 'Ag. Mapa') {
+    el.innerHTML = `
+      <div class="submit-info">Exportação enviada — aguardando Mapa Plantio (PDF).</div>
+      <button class="btn-submit" onclick="abrirArquivosProjeto()">📎 Upload Mapa Plantio →</button>`;
+  } else if (etapa === 'Concluído') {
+    el.innerHTML = `<div class="submit-info" style="color:var(--green)">✓ Projeto concluído.</div>`;
+  }
+}
+
+async function iniciarProjeto() {
+  if (!currentUser || !currentFaz) return;
+  const btn = document.getElementById('btnIniciar');
+  if (btn) btn.disabled = true;
+  const d    = FAZENDAS[currentFaz];
+  const tals = Object.values(d.talhoes || {});
+  const elegíveis = tals.filter(t => t.projeto === 'Pendente' && t.mapeamento === 'Sim');
+  if (!elegíveis.length) { showToast('Nenhum talhão elegível para iniciar.'); if (btn) btn.disabled = false; return; }
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/registrar_bloco`, {
+      method: 'POST',
+      headers: _sbHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ p_layers: elegíveis.map(t => t.layer), p_mapeamento: 'Sim', p_projeto: 'Andamento', p_usuario: currentUser }),
+    });
+    if (!res.ok) throw new Error(`registrar_bloco: ${res.status} ${await res.text()}`);
+    elegíveis.forEach(t => { t.projeto = 'Andamento'; });
+    records.push({ fazenda: currentFaz, talhoes: elegíveis.length, mapeamento: 'Sim', projeto: 'Andamento', ts: new Date().toISOString(), usuario: currentUser });
+    renderEtapa(currentFaz);
+    renderFazendas(currentNames);
+    renderLog();
+    updateStats();
+    showToast(`Iniciado — ${elegíveis.length} talhão(ões)`);
+  } catch (e) {
+    showToast(`Erro: ${e.message}`);
+    if (btn) btn.disabled = false;
+  }
 }
 
 // ── Plano da Semana ───────────────────────────────────────────────────────
