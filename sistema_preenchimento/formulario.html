@@ -1683,11 +1683,11 @@ function normalizaSistConser(raw) {
   return s;
 }
 
-// Sist. Conser. que exige Mapeamento antes do Projeto poder avançar (ver SETUP.md).
-// Base larga/vazio não precisam de mapeamento — Mapeamento já nasce/fica 'Sim'.
-const SIST_CONSER_PRECISA_MAPEAMENTO = new Set(['Embutido']);
+// Apenas Base Larga e Livre têm mapeamento automático 'Sim'; todo o resto exige ação manual.
+// Mantenha em sincronia com SIST_CONSER_MAPEAMENTO_AUTO em release-proxy.js.
+const SIST_CONSER_MAPEAMENTO_AUTO = new Set(['Base Larga', 'Livre']);
 function precisaMapeamento(sistConser) {
-  return SIST_CONSER_PRECISA_MAPEAMENTO.has(sistConser);
+  return !SIST_CONSER_MAPEAMENTO_AUTO.has(sistConser);
 }
 
 // Tag (cor) usada para exibir o Sist. Conser.: Base larga = ciano, Embutido = laranja, Livre = amarelo.
@@ -1703,7 +1703,7 @@ function sistConserTagCls(sistConser) {
 function rollupSistConser(tals) {
   const vals = tals.map(t => t.sistConser).filter(Boolean);
   if (!vals.length) return '';
-  if (vals.some(v => SIST_CONSER_PRECISA_MAPEAMENTO.has(v))) return 'Embutido';
+  if (vals.some(v => v === 'Embutido')) return 'Embutido';
   const counts = {};
   vals.forEach(v => counts[v] = (counts[v] || 0) + 1);
   return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];

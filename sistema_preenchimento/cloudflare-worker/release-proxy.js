@@ -34,9 +34,9 @@ const SUPABASE_ANON_KEY = 'sb_publishable_eJA9YDyXdRI73lqPPYnATA_INEU3vzu';
 // (config.json, que deixou de existir junto com esse script).
 const CODFAZ_EXCLUIR_PREFIXO = '20';
 
-// Mantenha em sincronia com SIST_CONSER_PRECISA_MAPEAMENTO em
-// formulario.html/engine/utils.py — não há como compartilhar código aqui.
-const SIST_CONSER_PRECISA_MAPEAMENTO = new Set(['Embutido']);
+// Mantenha em sincronia com SIST_CONSER_MAPEAMENTO_AUTO em
+// formulario.html — não há como compartilhar código aqui.
+const SIST_CONSER_MAPEAMENTO_AUTO = new Set(['Base Larga', 'Livre']);
 
 function corsHeaders() {
   return {
@@ -102,7 +102,7 @@ async function getOrCreateRelease(env, tag, name) {
 function rollupSistConser(valores) {
   const vals = valores.filter(Boolean);
   if (!vals.length) return '';
-  if (vals.some(v => SIST_CONSER_PRECISA_MAPEAMENTO.has(v))) return 'Embutido';
+  if (vals.some(v => v === 'Embutido')) return 'Embutido';
   const counts = {};
   vals.forEach(v => { counts[v] = (counts[v] || 0) + 1; });
   return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
@@ -156,7 +156,7 @@ async function importarDemanda(env, talhoes) {
 
   function statusInicial(blocoId, mapeamento) {
     const sc = blocoRollup.get(blocoId) || '';
-    if (SIST_CONSER_PRECISA_MAPEAMENTO.has(sc) && mapeamento !== 'Sim') return 'Aguard. Map.';
+    if (!SIST_CONSER_MAPEAMENTO_AUTO.has(sc) && mapeamento !== 'Sim') return 'Aguard. Map.';
     return 'Pendente';
   }
 
@@ -168,14 +168,14 @@ async function importarDemanda(env, talhoes) {
     if (!rec.area_ha) semArea++;
     if (!rec.sist_conser) semSistConser++;
     const scBloco = blocoRollup.get(rec.bloco_id) || '';
-    const semMapeamentoPendente = !SIST_CONSER_PRECISA_MAPEAMENTO.has(scBloco);
+    const autoSim = SIST_CONSER_MAPEAMENTO_AUTO.has(scBloco);
     const lyStr = String(rec.layer);
     let mapeamento, projeto;
     if (preserved.has(lyStr)) {
       const p = preserved.get(lyStr);
       mapeamento = p.mapeamento;
       projeto = p.projeto;
-      if (semMapeamentoPendente && mapeamento !== 'Sim') {
+      if (autoSim && mapeamento !== 'Sim') {
         mapeamento = 'Sim';
         mapeamentoCorrigido++;
       }
@@ -185,7 +185,7 @@ async function importarDemanda(env, talhoes) {
         projeto = novoProjeto;
       }
     } else {
-      mapeamento = semMapeamentoPendente ? 'Sim' : 'Não';
+      mapeamento = autoSim ? 'Sim' : 'Não';
       projeto = statusInicial(rec.bloco_id, mapeamento);
       novos++;
     }
@@ -236,7 +236,7 @@ async function atualizarPreparo(env, camadas) {
     const newSc = updateMap.get(layer);
     if (newSc === (row.sist_conser || '')) continue;
     const updated = { ...row, sist_conser: newSc };
-    if (!SIST_CONSER_PRECISA_MAPEAMENTO.has(newSc) && row.mapeamento !== 'Sim') {
+    if (SIST_CONSER_MAPEAMENTO_AUTO.has(newSc) && row.mapeamento !== 'Sim') {
       updated.mapeamento = 'Sim';
       mapeamentoCorrigido++;
     }

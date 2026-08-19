@@ -139,18 +139,17 @@ def normaliza_sist_conser(v):
 
 # ── Rollup de Sist. Conser. por bloco (mesma regra usada em formulario.html) ──
 # Qualquer talhão Embutido no bloco → bloco inteiro vira 'Embutido'.
-# Sem nenhum, vale o valor ('Base larga' ou '') com mais ocorrências.
-# Mantenha esta lógica em sincronia com SIST_CONSER_PRECISA_MAPEAMENTO/rollupSistConser
-# no formulario.html — não há como compartilhar código entre JS e Python aqui.
+# Apenas Base Larga e Livre têm mapeamento automático 'Sim'; o resto exige ação manual.
+# Mantenha em sincronia com SIST_CONSER_MAPEAMENTO_AUTO em formulario.html/release-proxy.js.
 
-SIST_CONSER_PRECISA_MAPEAMENTO = {'Embutido'}
+SIST_CONSER_MAPEAMENTO_AUTO = {'Base Larga', 'Livre'}
 
 
 def rollup_sist_conser(valores):
     vals = [v for v in valores if v]
     if not vals:
         return ''
-    if any(v in SIST_CONSER_PRECISA_MAPEAMENTO for v in vals):
+    if any(v == 'Embutido' for v in vals):
         return 'Embutido'
     from collections import Counter
     return Counter(vals).most_common(1)[0][0]
