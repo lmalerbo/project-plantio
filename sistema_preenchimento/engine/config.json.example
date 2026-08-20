@@ -1,0 +1,13 @@
+{
+  "_instrucoes": "Copie este arquivo para config.json e preencha os valores. Não commitar config.json (contém a service_role key).",
+
+  "supabase_url": "https://XXXX.supabase.co",
+  "supabase_service_key": "eyJ...",
+
+  "planagri_path": "\\\\servidor\\compartilhamento\\Plantio\\PLANAGRI 26-27.xlsx",
+  "sequencia_path": "\\\\servidor\\compartilhamento\\Plantio\\Sequencia Plantio.xlsx",
+
+  "senha_planilha": "senha_de_gravacao_ou_null",
+
+  "log_dir": "C:\\logs\\plantio"
+}

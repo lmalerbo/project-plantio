@@ -1,264 +1,353 @@
 """
 sincronizar_planilha.py
-Uso: python sincronizar_planilha.py  OU  duplo clique no SINCRONIZAR_PLANILHA.bat
+Roda todo dia no final do expediente no servidor Geo (Task Scheduler).
 
-Pensado pra rodar direto na pasta de rede onde a Sequência de Plantio mora —
-a tela Admin → "Sincronizar Planilha" do formulario.html ajuda a colocar este
-script (+ utils.py + requirements.txt) ali usando a File System Access API do
-navegador (Chrome/Edge). Por isso a planilha é procurada no diretório atual
-(*.xlsx), não numa subpasta.
+Lê o status atual do Supabase (schema plantio) e escreve de volta nas colunas
+AA (Sist. Conser.) / AB (Mapeamento) / AC (Projeto) da aba "Sequencia" da
+planilha de Sequência de Plantio configurada em config.json.
 
-Lê a tabela `programacao` do Supabase, agrupa por `bloco_id` (a mesma chave
-que já era calculada na importação: COD FAZ + MÊS DE PLANTIO + texto bruto de
-TALHÕES), aplica o rollup de Sist. Conser. por bloco e escreve de volta nas
-colunas Z (Sist. Conser.) / AA (Mapeamento) / AB (Projeto / Mapa) da aba
-"Sequencia" — localizando cada linha pelo mesmo bloco_id recalculado a partir
-do conteúdo atual da planilha (sobrevive a reordenação de linhas, mas não a
-uma edição de Código/Mês de Plantio/Talhões entre sincronizações).
+Matching feito por (CODIGO, mês-de-MES-DE-PLANTIO, TALHÕES expandidos) —
+substitui a lógica antiga de bloco_id que foi descontinuada com o PLANAGRI.
 
-Por quê Excel real (xlwings) em vez de openpyxl para escrever: a aba "Sequencia"
-tem mais de 100 regras de formatação condicional e várias listas de validação
-(são elas que colorem PENDENTE/ANDAMENTO/OK e os dropdowns) — abrir e salvar esse
-arquivo com openpyxl arrisca descartar essas extensões. Por isso este script só
-roda numa máquina Windows com Excel instalado, e a planilha não pode estar aberta
-em outra instância do Excel no momento da sincronização.
+Por que xlwings para escrita: a aba "Sequencia" tem mais de 100 regras de
+formatação condicional e listas de validação — abrir e salvar com openpyxl
+descarta essas extensões. xlwings usa o Excel real instalado na máquina.
+A planilha não pode estar aberta em outra instância durante a sincronização.
 
-A localização das linhas (achar_header, varredura de TALHÕES) é feita com
-openpyxl, só leitura — o Excel real (xlwings) é usado só para escrever as 3
-células e salvar, minimizando o que passa pelo motor de salvamento do Excel.
+Requer: openpyxl, requests, xlwings + Excel instalado no servidor
+Config: engine/config.json  (ver config.json.example)
 """
 
 import datetime
+import json
 import os
 import sys
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-_BASE_DIR   = os.path.dirname(_SCRIPT_DIR)   # sistema_preenchimento/
+_BASE_DIR   = os.path.dirname(_SCRIPT_DIR)
 sys.path.insert(0, _SCRIPT_DIR)
-from utils import (norm_header, redirecionar_stdout, fechar_log,
-                    achar_header, data_para_iso, rollup_sist_conser)
 
-_log_fh = redirecionar_stdout(os.path.join(_BASE_DIR, 'logs', 'sincronizar.log'))
+from utils import (
+    norm_header, strip_accents, redirecionar_stdout, fechar_log,
+    achar_header, data_para_iso, rollup_sist_conser, parse_talhoes,
+)
 
-import glob as _glob
-import json
+# ── Config ────────────────────────────────────────────────────────────────────
+# Tenta config.json unificado (modo servidor) primeiro; cai nos JSONs legados
+# (supabase_config.json + planilha_config.json) para rodar manualmente na rede.
 
-import requests
-import openpyxl
-import xlwings as xw
-
-_config_path = os.path.join(_BASE_DIR, 'supabase_config.json')
+_cfg = {}
+_config_path = os.path.join(_SCRIPT_DIR, 'config.json')
 if not os.path.exists(_config_path):
-    _config_path = os.path.join(_SCRIPT_DIR, 'supabase_config.json')  # fallback: engine/
-if not os.path.exists(_config_path):
-    print("ERRO: supabase_config.json não encontrado nem na pasta da planilha nem em engine/")
-    fechar_log(_log_fh)
-    input("\nPressione Enter para sair...")
-    sys.exit(1)
+    _config_path = os.path.join(_BASE_DIR, 'config.json')
 
-with open(_config_path, 'r', encoding='utf-8') as _f:
-    _sb_cfg = json.load(_f)
+if os.path.exists(_config_path):
+    with open(_config_path, encoding='utf-8') as _f:
+        _cfg = json.load(_f)
+    SUPABASE_URL   = _cfg['supabase_url'].rstrip('/')
+    SUPABASE_KEY   = _cfg['supabase_service_key']
+    SOURCE_PLANTIO = _cfg.get('sequencia_path')    # None → busca no diretório
+    SENHA_PLANILHA = _cfg.get('senha_planilha') or None
+    LOG_DIR        = _cfg.get('log_dir', os.path.join(_BASE_DIR, 'logs'))
+    _UNATTENDED    = True    # sem input() quando rodando pelo servidor
+else:
+    # Modo legado: JSONs separados + busca de planilha no diretório corrente
+    _sb_path = os.path.join(_BASE_DIR, 'supabase_config.json')
+    if not os.path.exists(_sb_path):
+        _sb_path = os.path.join(_SCRIPT_DIR, 'supabase_config.json')
+    if not os.path.exists(_sb_path):
+        print("ERRO: supabase_config.json não encontrado.")
+        sys.exit(1)
+    with open(_sb_path, encoding='utf-8') as _f:
+        _sb = json.load(_f)
+    SUPABASE_URL = _sb['url'].rstrip('/')
+    SUPABASE_KEY = _sb['key']
 
-SUPABASE_URL = _sb_cfg['url'].rstrip('/')
-SUPABASE_KEY = _sb_cfg['key']
-# Projeto compartilhado com o project-preparo — tabelas do Plantio isoladas no
-# schema "plantio" (ver migration), por isso Accept-Profile/Content-Profile.
-SB_HEADERS = {
-    'apikey': SUPABASE_KEY,
-    'Authorization': f'Bearer {SUPABASE_KEY}',
-    'Accept-Profile': 'plantio',
+    _pl_path = os.path.join(_BASE_DIR, 'planilha_config.json')
+    if not os.path.exists(_pl_path):
+        _pl_path = os.path.join(_SCRIPT_DIR, 'planilha_config.json')
+    SENHA_PLANILHA = None
+    if os.path.exists(_pl_path):
+        with open(_pl_path, encoding='utf-8') as _f:
+            SENHA_PLANILHA = json.load(_f).get('senha_plantio') or None
+    if not SENHA_PLANILHA:
+        print("AVISO: senha_plantio não encontrada — planilha com senha de gravação não será salva.\n")
+
+    SOURCE_PLANTIO = None   # vai buscar no diretório corrente
+    LOG_DIR        = os.path.join(_BASE_DIR, 'logs')
+    _UNATTENDED    = False
+
+os.makedirs(LOG_DIR, exist_ok=True)
+_log_fh = redirecionar_stdout(os.path.join(LOG_DIR, f'sincronizar_{datetime.date.today()}.log'))
+
+import glob as _glob    # noqa: E402
+import openpyxl         # noqa: E402
+import requests         # noqa: E402
+import xlwings as xw    # noqa: E402
+
+_SB_HEADERS = {
+    'apikey':          SUPABASE_KEY,
+    'Authorization':   f'Bearer {SUPABASE_KEY}',
+    'Accept-Profile':  'plantio',
     'Content-Profile': 'plantio',
 }
 
-# Planilha protegida por senha (proteção de gravação) — sem ela, o Excel abre a
-# planilha como somente-leitura ao automatizar via COM (sem dialogo pra perguntar),
-# e wb.save() não lança erro mas também não grava nada no disco.
-_planilha_cfg_path = os.path.join(_BASE_DIR, 'planilha_config.json')
-if not os.path.exists(_planilha_cfg_path):
-    _planilha_cfg_path = os.path.join(_SCRIPT_DIR, 'planilha_config.json')  # fallback: engine/
-SENHA_PLANILHA = None
-if os.path.exists(_planilha_cfg_path):
-    with open(_planilha_cfg_path, 'r', encoding='utf-8') as _f:
-        SENHA_PLANILHA = json.load(_f).get('senha_plantio') or None
-if not SENHA_PLANILHA:
-    print(f"AVISO: planilha_config.json não encontrado ou sem 'senha_plantio' — "
-          "se a planilha tiver senha de gravação, a sincronização vai abrir em modo "
-          "somente-leitura e salvar silenciosamente sem efeito.\n")
 
-os.chdir(_BASE_DIR)
-
-# ── 1. Lê programação do Supabase e agrupa por bloco_id ───────────────────
-print("Lendo programação do Supabase...")
-_res = requests.get(
-    f"{SUPABASE_URL}/rest/v1/programacao?select=bloco_id,sist_conser,mapeamento,projeto",
-    headers=SB_HEADERS,
-    timeout=30,
-)
-if not _res.ok:
-    print(f"ERRO ao ler programacao: {_res.status_code} {_res.text}")
+def _encerrar(codigo=1):
     fechar_log(_log_fh)
-    input("\nPressione Enter para sair...")
-    sys.exit(1)
+    if not _UNATTENDED:
+        input("\nPressione Enter para sair...")
+    sys.exit(codigo)
 
-_por_bloco = {}
-for row in _res.json():
-    bloco_id = row.get('bloco_id')
-    if not bloco_id:
-        continue
-    _por_bloco.setdefault(bloco_id, []).append(row)
 
-_PROJ_RANK = {'Aguard. Map.': 0, 'Pendente': 1, 'Andamento': 2, 'Ok': 3}
+# ── 1. Lê programação do Supabase (paginado) ──────────────────────────────────
+
+print(f"[{datetime.datetime.now():%H:%M:%S}] Lendo programação do Supabase...")
+
+_por_chave = {}   # (cod_faz_int, mes_num, talhao_int) → {sist_conser, mapeamento, projeto}
+_offset = 0
+_LIMIT  = 1000
+
+while True:
+    _r = requests.get(
+        f"{SUPABASE_URL}/rest/v1/programacao"
+        f"?select=cod_faz,talhao,mes_plantio,sist_conser,mapeamento,projeto"
+        f"&limit={_LIMIT}&offset={_offset}",
+        headers=_SB_HEADERS,
+        timeout=30,
+    )
+    if not _r.ok:
+        print(f"ERRO ao ler programacao: {_r.status_code} {_r.text}")
+        _encerrar()
+    _batch = _r.json()
+    for _row in _batch:
+        try:
+            _cod = int(_row['cod_faz'])
+            _mes = int(_row['mes_plantio']) if _row.get('mes_plantio') else None
+            _tal = int(_row['talhao']) if _row.get('talhao') is not None else None
+        except (ValueError, TypeError):
+            continue
+        if _cod and _mes and _tal is not None:
+            _por_chave[(_cod, _mes, _tal)] = {
+                'sist_conser': _row.get('sist_conser') or '',
+                'mapeamento':  _row.get('mapeamento') or 'Não',
+                'projeto':     _row.get('projeto') or 'Pendente',
+            }
+    if len(_batch) < _LIMIT:
+        break
+    _offset += _LIMIT
+
+print(f"  {len(_por_chave)} talhão-chave(s) carregado(s) do Supabase.")
+
+
+# ── 2. Rollup por grupo (mesma lógica do frontend) ────────────────────────────
+
+_PROJ_RANK = {'Aguard. Map.': 0, 'Pendente': 1, 'Andamento': 2, 'Ag. Mapa': 3, 'Ok': 4}
+
 
 def rollup_projeto(valores):
-    """Pior rank ganha — igual ao reduce do getBlocos no web."""
-    worst = 'Ok'
+    """Pior rank ganha — igual ao getFazEtapa do web."""
+    pior = 'Ok'
     for v in valores:
         p = v or 'Pendente'
-        if _PROJ_RANK.get(p, 1) < _PROJ_RANK.get(worst, 3):
-            worst = p
-    return worst
+        if _PROJ_RANK.get(p, 1) < _PROJ_RANK.get(pior, 4):
+            pior = p
+    return pior
 
-blocos = {}   # bloco_id → (sist_conser, mapeamento, projeto)
-for bloco_id, rows in _por_bloco.items():
-    sist_conser = rollup_sist_conser([r.get('sist_conser') for r in rows])
-    mapeamento  = 'Sim' if all(r.get('mapeamento') == 'Sim' for r in rows) else 'Não'
-    projeto     = rollup_projeto([r.get('projeto') for r in rows])
-    blocos[bloco_id] = (sist_conser, mapeamento, projeto)
-print(f"  {len(blocos)} bloco(s) carregado(s) do Supabase.\n")
 
-# ── 2. Localiza, por leitura (openpyxl), as linhas que batem com cada bloco ──
-# Planilha procurada no diretório atual (este script roda na mesma pasta de
-# rede onde ela mora — ver docstring no topo do arquivo). Ignora os arquivos
-# de lock temporário do Excel ("~$nome.xlsx", criados enquanto o arquivo está
-# aberto em outra instância).
-print("Localizando planilha de Sequência de Plantio...")
-_xlsx_candidates = sorted(f for f in _glob.glob("*.xlsx") if not os.path.basename(f).startswith('~$'))
-if not _xlsx_candidates:
-    print("ERRO: Nenhum arquivo .xlsx encontrado nesta pasta.")
-    fechar_log(_log_fh)
-    input("\nPressione Enter para sair...")
-    sys.exit(1)
+def rollup_grupo(talhoes_dados):
+    sc   = rollup_sist_conser([d['sist_conser'] for d in talhoes_dados])
+    mapa = 'Sim' if all(d['mapeamento'] == 'Sim' for d in talhoes_dados) else 'Não'
+    proj = rollup_projeto([d['projeto'] for d in talhoes_dados])
+    return sc, mapa, proj
 
-SOURCE_PLANTIO = None
-sheet_seq = None
-for _candidate in _xlsx_candidates:
-    _wb_check = openpyxl.load_workbook(_candidate, read_only=True, data_only=True)
-    _seq = next((n for n in _wb_check.sheetnames if norm_header(n) == 'SEQUENCIA'), None)
+
+# ── 3. Localiza a planilha de Sequência de Plantio ───────────────────────────
+
+print(f"[{datetime.datetime.now():%H:%M:%S}] Localizando planilha...")
+
+if SOURCE_PLANTIO:
+    if not os.path.exists(SOURCE_PLANTIO):
+        print(f"ERRO: planilha não encontrada: {SOURCE_PLANTIO}")
+        _encerrar()
+    sheet_seq_name = None
+    _wb_check = openpyxl.load_workbook(SOURCE_PLANTIO, read_only=True, data_only=True)
+    sheet_seq_name = next((n for n in _wb_check.sheetnames if norm_header(n) == 'SEQUENCIA'), None)
     _wb_check.close()
-    if _seq:
-        SOURCE_PLANTIO = os.path.abspath(_candidate)
-        sheet_seq = _seq
-        break
-if not SOURCE_PLANTIO:
-    print(f"ERRO: Nenhum .xlsx com aba 'Sequencia' encontrado. Arquivos verificados: {_xlsx_candidates}")
-    fechar_log(_log_fh)
-    input("\nPressione Enter para sair...")
-    sys.exit(1)
+    if not sheet_seq_name:
+        print(f"ERRO: aba 'Sequencia' não encontrada em {SOURCE_PLANTIO}")
+        _encerrar()
+else:
+    # Modo legado: busca no diretório corrente
+    _cwd = os.getcwd()
+    _candidates = sorted(f for f in _glob.glob(os.path.join(_cwd, '*.xlsx'))
+                         if not os.path.basename(f).startswith('~$'))
+    SOURCE_PLANTIO = None
+    sheet_seq_name = None
+    for _c in _candidates:
+        _wb_c = openpyxl.load_workbook(_c, read_only=True, data_only=True)
+        _s = next((n for n in _wb_c.sheetnames if norm_header(n) == 'SEQUENCIA'), None)
+        _wb_c.close()
+        if _s:
+            SOURCE_PLANTIO = os.path.abspath(_c)
+            sheet_seq_name = _s
+            break
+    if not SOURCE_PLANTIO:
+        print(f"ERRO: nenhum .xlsx com aba 'Sequencia' encontrado em {_cwd}")
+        _encerrar()
+
 print(f"  Planilha: {SOURCE_PLANTIO}")
 
-wb_ro = openpyxl.load_workbook(SOURCE_PLANTIO, data_only=True)
-ws_ro = wb_ro[sheet_seq]
 
-LIMITE_COL = openpyxl.utils.column_index_from_string('AB')
-header_row, hmap = achar_header(ws_ro, ['MES DE PLANTIO', 'CODIGO', 'SECAO', 'TALHOES'], max_row=10, max_col=LIMITE_COL)
-if header_row is None:
-    print(f"ERRO: Cabeçalho (Mês de Plantio/Código/Seção/Talhões) não encontrado na aba '{sheet_seq}'.")
-    fechar_log(_log_fh)
-    input("\nPressione Enter para sair...")
-    sys.exit(1)
+# ── 4. Lê linhas (openpyxl, somente leitura) e faz o match ───────────────────
 
-idx_mes = hmap['MES DE PLANTIO']
-idx_cod = hmap['CODIGO']
-idx_tal = hmap['TALHOES']
+_wb_ro = openpyxl.load_workbook(SOURCE_PLANTIO, data_only=True)
+_ws_ro = _wb_ro[sheet_seq_name]
 
-linhas_para_escrever = []   # [(numero_da_linha, sist_conser, mapeamento, projeto)]
-blocos_restantes = dict(blocos)
-for i, row in enumerate(ws_ro.iter_rows(min_row=header_row + 1, max_row=ws_ro.max_row, max_col=LIMITE_COL, values_only=True), start=header_row + 1):
-    cod_raw = row[idx_cod] if idx_cod < len(row) else None
-    tal_raw = row[idx_tal] if idx_tal < len(row) else None
-    mes_raw = row[idx_mes] if idx_mes < len(row) else None
-    if cod_raw is None or tal_raw is None:
+_LIMITE_COL = openpyxl.utils.column_index_from_string('AC')
+_header_row, _hmap = achar_header(
+    _ws_ro,
+    ['MES DE PLANTIO', 'CODIGO', 'TALHOES'],
+    max_row=10,
+    max_col=_LIMITE_COL,
+)
+if _header_row is None:
+    print("ERRO: cabeçalho (Mês de Plantio / Código / Talhões) não encontrado.")
+    _wb_ro.close()
+    _encerrar()
+
+_idx_mes = _hmap.get('MES DE PLANTIO')
+_idx_cod = _hmap.get('CODIGO')
+_idx_tal = _hmap.get('TALHOES')
+
+
+def _mes_raw_para_numero(v):
+    """Extrai o mês (1-12) de uma célula que pode ser datetime, date ou string."""
+    if isinstance(v, (datetime.datetime, datetime.date)):
+        return v.month
+    if isinstance(v, str):
+        s = v.strip()
+        _MESES = {
+            'JANEIRO':1,'FEVEREIRO':2,'MARCO':3,'ABRIL':4,'MAIO':5,'JUNHO':6,
+            'JULHO':7,'AGOSTO':8,'SETEMBRO':9,'OUTUBRO':10,'NOVEMBRO':11,'DEZEMBRO':12,
+        }
+        num = _MESES.get(strip_accents(s).upper())
+        if num:
+            return num
+        try:
+            return datetime.date.fromisoformat(s[:10]).month
+        except ValueError:
+            pass
+    return None
+
+
+linhas_para_escrever = []
+n_sem_dados = 0
+
+for _i, _row in enumerate(
+    _ws_ro.iter_rows(
+        min_row=_header_row + 1,
+        max_row=_ws_ro.max_row,
+        max_col=_LIMITE_COL,
+        values_only=True,
+    ),
+    start=_header_row + 1,
+):
+    _cod_raw = _row[_idx_cod] if _idx_cod < len(_row) else None
+    _tal_raw = _row[_idx_tal] if _idx_tal < len(_row) else None
+    _mes_raw = _row[_idx_mes] if _idx_mes < len(_row) else None
+
+    if _cod_raw is None or _tal_raw is None:
         continue
     try:
-        cod_faz = int(cod_raw)
+        _cod_int = int(_cod_raw)
     except (ValueError, TypeError):
         continue
-    mes_iso = data_para_iso(mes_raw)
-    bloco_id = f"{cod_faz}|{mes_iso}|{str(tal_raw).strip()}"
 
-    if bloco_id in blocos_restantes:
-        sist_conser, mapeamento, projeto = blocos_restantes.pop(bloco_id)
-        linhas_para_escrever.append((i, sist_conser, mapeamento, projeto))
+    _mes_num  = _mes_raw_para_numero(_mes_raw)
+    _talhoes  = parse_talhoes(_tal_raw)
 
-print(f"  {len(linhas_para_escrever)} linha(s) encontrada(s) pra atualizar.")
-if blocos_restantes:
-    print(f"  ⚠  {len(blocos_restantes)} bloco(s) do Supabase não encontrados na planilha "
-          f"(Código/Mês de Plantio/Talhões pode ter sido editado desde a última Atualização de Demanda):")
-    for b in sorted(blocos_restantes)[:10]:
-        print(f"     {b}")
-    if len(blocos_restantes) > 10:
-        print(f"     ... e mais {len(blocos_restantes) - 10}")
-print()
+    if not _talhoes or _mes_num is None:
+        n_sem_dados += 1
+        continue
+
+    _matches = [
+        _por_chave[(_cod_int, _mes_num, t)]
+        for t in _talhoes
+        if (_cod_int, _mes_num, t) in _por_chave
+    ]
+
+    if not _matches:
+        continue
+
+    sc, mapa, proj = rollup_grupo(_matches)
+    linhas_para_escrever.append((_i, sc, mapa, proj))
+
+_wb_ro.close()
+
+print(f"  {len(linhas_para_escrever)} linha(s) a atualizar | {n_sem_dados} sem match de dados.")
 
 if not linhas_para_escrever:
     print("Nada para escrever na planilha.")
     fechar_log(_log_fh)
     sys.exit(0)
 
-# ── 3. Escreve via Excel real (preserva formatação condicional/validação) ──
-# Sem a senha de gravação, o Excel automatizado via COM abre a planilha como
-# somente-leitura (sem mostrar diálogo nenhum) — wb.save() não lança erro, mas
-# também não grava nada no disco. Por isso a senha (planilha_config.json) é
-# passada explicitamente no Open. Além disso, salva num arquivo temporário e
-# substitui o original via os.replace() (atômico, não depende do Excel) em vez
-# de salvar direto por cima — reduz o impacto de qualquer outra contenção
-# pontual (antivírus/indexador) no exato momento da troca do arquivo.
-COL_AA, COL_AB, COL_AC = 27, 28, 29   # Sist. Conser. / Mapeamento / Projeto-Mapa (1-based)
-print(f"Abrindo Excel para escrever... (colunas AA={COL_AA} AB={COL_AB} AC={COL_AC})")
+
+# ── 5. Escreve via Excel real (preserva formatação condicional/validação) ─────
+
+COL_AA = 27   # Sist. Conser.
+COL_AB = 28   # Mapeamento
+COL_AC = 29   # Projeto / Mapa
+
+print(f"[{datetime.datetime.now():%H:%M:%S}] Abrindo Excel para escrita...")
 
 _tmp_path = SOURCE_PLANTIO + '.sync_tmp.xlsx'
 if os.path.exists(_tmp_path):
     os.remove(_tmp_path)
 
-app = xw.App(visible=False)
-app.display_alerts = False
+_app = xw.App(visible=False)
+_app.display_alerts = False
 try:
-    # write_res_password = senha de proteção de gravação (diferente da senha de abertura)
-    wb = app.books.open(SOURCE_PLANTIO,
-                        password=SENHA_PLANILHA,
-                        write_res_password=SENHA_PLANILHA)
-    print(f"  ReadOnly={wb.api.ReadOnly}")
-    ws = wb.sheets[sheet_seq]
-    for linha, sist_conser, mapeamento, projeto in linhas_para_escrever:
-        ws.range((linha, COL_AA)).value = sist_conser
-        ws.range((linha, COL_AB)).value = mapeamento
-        ws.range((linha, COL_AC)).value = projeto
-    ws.range((3, COL_AC)).value = f"Atualizado em: {datetime.date.today().strftime('%d/%m/%Y')}"
-    # Verificação: lê de volta a primeira linha escrita
-    if linhas_para_escrever:
-        l0, sc0, ma0, pr0 = linhas_para_escrever[0]
-        sc_v = ws.range((l0, COL_AA)).value
-        ma_v = ws.range((l0, COL_AB)).value
-        pr_v = ws.range((l0, COL_AC)).value
-        print(f"  Verificação linha {l0}: AA={sc_v!r} AB={ma_v!r} AC={pr_v!r}  "
-              f"(esperado: AA={sc0!r} AB={ma0!r} AC={pr0!r})")
-    wb.save(_tmp_path)
+    _wb = _app.books.open(
+        SOURCE_PLANTIO,
+        password=SENHA_PLANILHA,
+        write_res_password=SENHA_PLANILHA,
+    )
+    print(f"  ReadOnly={_wb.api.ReadOnly}")
+    _ws = _wb.sheets[sheet_seq_name]
+
+    for _linha, _sc, _mapa, _proj in linhas_para_escrever:
+        _ws.range((_linha, COL_AA)).value = _sc
+        _ws.range((_linha, COL_AB)).value = _mapa
+        _ws.range((_linha, COL_AC)).value = _proj
+
+    # Carimbo de data na linha 3, coluna AC
+    _ws.range((3, COL_AC)).value = f"Atualizado em: {datetime.date.today().strftime('%d/%m/%Y')}"
+
+    # Verificação rápida: lê de volta a primeira linha escrita
+    _l0, _sc0, _ma0, _pr0 = linhas_para_escrever[0]
+    _check_sc = _ws.range((_l0, COL_AA)).value
+    _check_ma = _ws.range((_l0, COL_AB)).value
+    _check_pr = _ws.range((_l0, COL_AC)).value
+    print(f"  Verificação linha {_l0}: AA={_check_sc!r} AB={_check_ma!r} AC={_check_pr!r}")
+
+    _wb.save(_tmp_path)
 finally:
-    wb.close()
-    app.quit()
+    _wb.close()
+    _app.quit()
 
 _orig_size = os.path.getsize(SOURCE_PLANTIO)
 _tmp_size  = os.path.getsize(_tmp_path)
-print(f"  tmp salvo: {_tmp_size} bytes  (original: {_orig_size} bytes)")
+print(f"  tmp: {_tmp_size} bytes | original: {_orig_size} bytes")
+
 try:
     os.replace(_tmp_path, SOURCE_PLANTIO)
-    print("  os.replace OK")
+    print("  Arquivo substituído (os.replace).")
 except OSError as _e:
     import shutil
-    print(f"  os.replace falhou ({_e}), usando shutil.copy2")
+    print(f"  os.replace falhou ({_e}), usando shutil.copy2...")
     shutil.copy2(_tmp_path, SOURCE_PLANTIO)
     os.remove(_tmp_path)
-print(f"  {len(linhas_para_escrever)} linha(s) escrita(s) e planilha salva.")
 
-print("\nSincronização concluída.")
+print(f"\n✓ Sincronização concluída: {len(linhas_para_escrever)} linha(s) atualizadas.")
 fechar_log(_log_fh)

@@ -13,3 +13,7 @@ sistema_preenchimento/supabase/.branches
 
 # Senha da planilha de Plantio (ver planilha_config.example.json)
 sistema_preenchimento/planilha_config.json
+
+# Config unificado do servidor (supabase_service_key + caminhos de rede)
+sistema_preenchimento/engine/config.json
+sistema_preenchimento/config.json
