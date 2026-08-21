@@ -3330,7 +3330,11 @@ function renderEtapa(name) {
   // Ação
   const el = document.getElementById('etapaAcao');
   if (etapa === 'Ag. Mapeamento') {
-    el.innerHTML = `<div class="submit-info" style="color:var(--accent)">⚠ Aguardando mapeamento — sincronize o Preparo ou ajuste manualmente.</div>`;
+    const ok = !!currentUser;
+    const pendentes = tals.filter(t => t.mapeamento !== 'Sim').length;
+    el.innerHTML = `
+      <div class="submit-info" style="color:var(--accent)">⚠ ${pendentes} talhão(ões) aguardando mapeamento${ok ? ' — registre aqui quando o mapa estiver aprovado.' : ' — selecione seu usuário.'}</div>
+      <button class="btn-submit" id="btnMapeamento" onclick="registrarMapeamento()" ${!ok ? 'disabled' : ''}>✓ Mapeamento Concluído →</button>`;
   } else if (etapa === 'Pendente') {
     const ok = !!currentUser;
     el.innerHTML = `
@@ -3346,6 +3350,32 @@ function renderEtapa(name) {
       <button class="btn-submit" onclick="abrirUploadMapaPlantio()">📎 Upload Mapa Plantio (PDF) →</button>`;
   } else if (etapa === 'Concluído') {
     el.innerHTML = `<div class="submit-info" style="color:var(--green)">✓ Projeto concluído.</div>`;
+  }
+}
+
+async function registrarMapeamento() {
+  if (!currentUser || !currentFaz) return;
+  const btn = document.getElementById('btnMapeamento');
+  if (btn) btn.disabled = true;
+  const tals = Object.values(FAZENDAS[currentFaz]?.talhoes || {});
+  const pendentes = tals.filter(t => t.mapeamento !== 'Sim');
+  if (!pendentes.length) { showToast('Todos os talhões já têm mapeamento.'); if (btn) btn.disabled = false; return; }
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/registrar_bloco`, {
+      method: 'POST',
+      headers: _sbHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ p_layers: pendentes.map(t => t.layer), p_mapeamento: 'Sim', p_projeto: 'Pendente', p_usuario: currentUser }),
+    });
+    if (!res.ok) throw new Error(`registrar_bloco: ${res.status} ${await res.text()}`);
+    pendentes.forEach(t => { t.mapeamento = 'Sim'; t.projeto = 'Pendente'; });
+    records.push({ fazenda: currentFaz, talhoes: pendentes.length, mapeamento: 'Sim', projeto: 'Pendente', ts: new Date().toISOString(), usuario: currentUser });
+    renderEtapa(currentFaz);
+    renderFazendas(currentNames);
+    renderLog();
+    updateStats();
+  } catch (e) {
+    showToast(`Erro: ${e.message}`);
+    if (btn) btn.disabled = false;
   }
 }
 
