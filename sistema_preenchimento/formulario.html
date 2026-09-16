@@ -2392,13 +2392,13 @@ async function _avancarEtapaFazenda(novoStatus) {
   updateStats();
 }
 
-function abrirUploadExportacao() {
+function abrirUploadExportacao(semAvancar = false) {
   if (!currentFaz) return;
   const cod = String(FAZENDAS[currentFaz]?.cod ?? '');
   _arquivosEsperados = [{ cod, faz: currentFaz, suf: 'Exp0', ext: 'zip', opcional: false,
     nome: `${cod}_*_Exp0.zip`, ok: false, matched: null }];
   _arquivosSelecionados = [];
-  _onUploadSuccess = async () => { await _avancarEtapaFazenda('Ag. Mapa'); };
+  _onUploadSuccess = semAvancar ? null : async () => { await _avancarEtapaFazenda('Ag. Mapa'); };
   _abrirConsolidarModal(`Exportação — ${currentFaz}`, `
     <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
       Selecione o ZIP da exportação. Padrão: <code>${escapeHtml(cod)}_*_Exp{N}.zip</code>
@@ -2431,11 +2431,11 @@ function _adicionarMapaPlantio(input, cod) {
   if (btn) btn.disabled = false;
 }
 
-function abrirUploadMapaPlantio() {
+function abrirUploadMapaPlantio(semAvancar = false) {
   if (!currentFaz) return;
   const cod = String(FAZENDAS[currentFaz]?.cod ?? '');
   _mapaFile = null;
-  _onUploadSuccess = async () => { await _avancarEtapaFazenda('Ok'); };
+  _onUploadSuccess = semAvancar ? null : async () => { await _avancarEtapaFazenda('Ok'); };
   _abrirConsolidarModal(`Mapa Plantio — ${currentFaz}`, `
     <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
       Selecione o PDF do Mapa de Plantio. Padrão: <code>${escapeHtml(cod)}_*_MapaPlantio.pdf</code>
@@ -3349,7 +3349,12 @@ function renderEtapa(name) {
       <div class="submit-info">Exportação enviada — faça upload do Mapa Plantio (PDF) para concluir.</div>
       <button class="btn-submit" onclick="abrirUploadMapaPlantio()">📎 Upload Mapa Plantio (PDF) →</button>`;
   } else if (etapa === 'Concluído') {
-    el.innerHTML = `<div class="submit-info" style="color:var(--green)">✓ Projeto concluído.</div>`;
+    el.innerHTML = `
+      <div class="submit-info" style="color:var(--green)">✓ Projeto concluído.</div>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <button class="btn-modal-cancel" onclick="abrirUploadExportacao(true)">↻ Exportação (ZIP)</button>
+        <button class="btn-modal-cancel" onclick="abrirUploadMapaPlantio(true)">↻ Mapa Plantio (PDF)</button>
+      </div>`;
   }
 }
 
