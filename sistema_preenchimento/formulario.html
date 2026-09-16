@@ -1175,7 +1175,8 @@
             <span id="formFazTitle">—</span>
             <span class="frente-tag" id="formBlocoTag">—</span>
           </div>
-          <div style="display:flex;align-items:center;gap:12px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div id="etapaHeaderAcoes" style="display:flex;gap:6px"></div>
             <div style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace" id="formCodTag">—</div>
           </div>
         </div>
@@ -3296,6 +3297,9 @@ function getFazEtapa(name) {
 
 function renderEtapa(name) {
   if (!name) return;
+  // Limpa header de ações (preenchido só no Concluído)
+  const hdr = document.getElementById('etapaHeaderAcoes');
+  if (hdr) hdr.innerHTML = '';
   const d    = FAZENDAS[name];
   // inclui o número do talhão como propriedade (a chave do objeto não vem em Object.values)
   const tals = Object.entries(d?.talhoes || {}).map(([k, v]) => ({ talhao: +k, ...v }));
@@ -3349,12 +3353,10 @@ function renderEtapa(name) {
       <div class="submit-info">Exportação enviada — faça upload do Mapa Plantio (PDF) para concluir.</div>
       <button class="btn-submit" onclick="abrirUploadMapaPlantio()">📎 Upload Mapa Plantio (PDF) →</button>`;
   } else if (etapa === 'Concluído') {
-    el.innerHTML = `
-      <div class="submit-info" style="color:var(--green)">✓ Projeto concluído.</div>
-      <div style="display:flex;gap:8px;margin-top:6px">
-        <button class="btn-modal-cancel" onclick="abrirUploadExportacao(true)">↻ Exportação (ZIP)</button>
-        <button class="btn-modal-cancel" onclick="abrirUploadMapaPlantio(true)">↻ Mapa Plantio (PDF)</button>
-      </div>`;
+    el.innerHTML = `<div class="submit-info" style="color:var(--green)">✓ Projeto concluído.</div>`;
+    if (hdr) hdr.innerHTML = `
+      <button class="btn-modal-cancel" onclick="abrirUploadExportacao(true)">↻ Exportação</button>
+      <button class="btn-modal-cancel" onclick="abrirUploadMapaPlantio(true)">↻ Mapa Plantio</button>`;
   }
 
   // Rollback — aparece em todas as etapas exceto a primeira, só com usuário selecionado
