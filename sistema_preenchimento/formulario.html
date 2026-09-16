@@ -3356,6 +3356,42 @@ function renderEtapa(name) {
         <button class="btn-modal-cancel" onclick="abrirUploadMapaPlantio(true)">↻ Mapa Plantio (PDF)</button>
       </div>`;
   }
+
+  // Rollback — aparece em todas as etapas exceto a primeira, só com usuário selecionado
+  if (etapaIdx > 0 && currentUser) {
+    const _ETAPA_TO_DB = { 'Ag. Mapeamento': 'Aguard. Map.', 'Pendente': 'Pendente', 'Andamento': 'Andamento', 'Ag. Mapa': 'Ag. Mapa', 'Concluído': 'Ok' };
+    const opts = ETAPAS.slice(0, etapaIdx).map(e =>
+      `<button style="font-size:11px;padding:2px 8px;border-radius:10px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;margin-left:4px"
+        onclick="retrocederEtapa('${_ETAPA_TO_DB[e]}')">${e}</button>`
+    ).join('');
+    el.innerHTML += `<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:11px;color:var(--muted)">↩ Retroceder para: ${opts}</div>`;
+  }
+}
+
+async function retrocederEtapa(novoDbStatus) {
+  if (!currentFaz || !currentUser) return;
+  const tals = Object.values(FAZENDAS[currentFaz]?.talhoes || {});
+  const layers = tals.map(t => t.layer).filter(Boolean).map(Number);
+  if (!layers.length) return;
+  // Ao retroceder para Ag. Mapeamento reseta mapeamento; nos demais mantém Sim
+  const mapeamento = novoDbStatus === 'Aguard. Map.' ? 'Não' : 'Sim';
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/registrar_bloco`, {
+      method: 'POST',
+      headers: _sbHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ p_layers: layers, p_mapeamento: mapeamento, p_projeto: novoDbStatus, p_usuario: currentUser }),
+    });
+    if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+    tals.forEach(t => {
+      t.projeto = novoDbStatus;
+      if (novoDbStatus === 'Aguard. Map.') t.mapeamento = 'Não';
+    });
+    renderEtapa(currentFaz);
+    renderFazendas(currentNames);
+    updateStats();
+  } catch (e) {
+    showToast(`Erro ao retroceder: ${e.message}`);
+  }
 }
 
 async function registrarMapeamento() {
