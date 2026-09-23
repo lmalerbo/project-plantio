@@ -364,6 +364,36 @@
     border-radius:5px; padding:5px 10px; font-size:12px; cursor:pointer; }
   .consulta-filters select:focus { outline:none; border-color:var(--accent); }
   .consulta-filter-count { font-size:11px; color:var(--muted); margin-left:auto; white-space:nowrap; }
+  .ms-filter { position:relative; display:inline-block; }
+  .ms-filter-btn {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 4px;
+    color: var(--muted); font-size: 11px; font-family: monospace; font-weight: 700;
+    padding: 3px 8px; cursor: pointer; transition: all .15s; outline: none;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .ms-filter-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .ms-filter-btn.active { border-color: var(--green); color: var(--green); background: rgba(76,175,114,.10); }
+  .ms-filter-arrow { font-size: 8px; opacity: .7; }
+  .ms-filter-panel {
+    display: none; position: absolute; top: calc(100% + 4px); left: 0;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    min-width: 190px; max-height: 260px; overflow-y: auto; z-index: 70;
+    box-shadow: 0 8px 24px rgba(0,0,0,.25); padding: 4px 0;
+  }
+  .ms-filter-panel.open { display: block; }
+  .ms-filter-opt {
+    display: flex; align-items: center; gap: 8px; padding: 6px 12px;
+    font-size: 12px; cursor: pointer; transition: background .1s; white-space: nowrap;
+  }
+  .ms-filter-opt:hover { background: var(--surface2); }
+  .ms-filter-opt input { cursor: pointer; accent-color: var(--accent); width: 13px; height: 13px; flex-shrink: 0; }
+  .ms-filter-empty { padding: 8px 12px; font-size: 11px; color: var(--muted); }
+  .ms-filter-foot { display: flex; justify-content: flex-end; padding: 6px 12px 2px; margin-top: 4px; border-top: 1px solid var(--border); }
+  .ms-filter-foot button {
+    background: none; border: none; color: var(--accent); font-size: 10px; font-weight: 700;
+    cursor: pointer; padding: 2px 4px; text-transform: uppercase; letter-spacing: .5px;
+  }
+  .ms-filter-foot button:hover { text-decoration: underline; }
   .btn-limpar-filtros { background:none; border:1px solid var(--border); color:var(--muted);
     border-radius:5px; padding:5px 10px; font-size:11px; cursor:pointer; }
   .btn-limpar-filtros:hover { border-color:var(--accent); color:var(--accent); }
@@ -1227,23 +1257,30 @@
     </div>
     <div class="faz-filter-row">
       <span class="faz-filter-label">Filtro:</span>
-      <select id="cFiltroMes" class="mes-filter-select" onchange="renderConsulta()">
-        <option value="">— todos os meses —</option>
-      </select>
-      <select id="cFiltroStatus" class="mes-filter-select" onchange="renderConsulta()">
-        <option value="">— todos os status —</option>
-        <option value="PENDENTE">Pendente</option>
-        <option value="ANDAMENTO">Andamento</option>
-        <option value="OK">Ok</option>
-      </select>
-      <select id="cFiltroSistConser" class="mes-filter-select" onchange="renderConsulta()">
-        <option value="">— todos os Sist. Conser. —</option>
-      </select>
-      <select id="cFiltroArquivos" class="mes-filter-select" onchange="renderConsulta()">
-        <option value="">— arquivos —</option>
-        <option value="SIM">Com arquivos</option>
-        <option value="NAO">Sem arquivos</option>
-      </select>
+      <div class="ms-filter" id="msMes">
+        <button type="button" class="ms-filter-btn" id="msMesBtn" onclick="toggleMsPanel('msMes')">
+          <span id="msMesLabel">Mês</span><span class="ms-filter-arrow">&#9662;</span>
+        </button>
+        <div class="ms-filter-panel" id="msMesPanel"></div>
+      </div>
+      <div class="ms-filter" id="msStatus">
+        <button type="button" class="ms-filter-btn" id="msStatusBtn" onclick="toggleMsPanel('msStatus')">
+          <span id="msStatusLabel">Status</span><span class="ms-filter-arrow">&#9662;</span>
+        </button>
+        <div class="ms-filter-panel" id="msStatusPanel"></div>
+      </div>
+      <div class="ms-filter" id="msSc">
+        <button type="button" class="ms-filter-btn" id="msScBtn" onclick="toggleMsPanel('msSc')">
+          <span id="msScLabel">Sist. Conser.</span><span class="ms-filter-arrow">&#9662;</span>
+        </button>
+        <div class="ms-filter-panel" id="msScPanel"></div>
+      </div>
+      <div class="ms-filter" id="msArq">
+        <button type="button" class="ms-filter-btn" id="msArqBtn" onclick="toggleMsPanel('msArq')">
+          <span id="msArqLabel">Arquivos</span><span class="ms-filter-arrow">&#9662;</span>
+        </button>
+        <div class="ms-filter-panel" id="msArqPanel"></div>
+      </div>
       <button class="faz-filter-btn" id="btnConsultaSel" onclick="toggleConsultaSelectMode()">&#9744; Selecionar</button>
       <button class="faz-filter-btn" onclick="limparFiltrosConsulta()">Limpar</button>
       <span class="consulta-filter-count" id="consultaCount"></span>
@@ -3613,6 +3650,82 @@ function debouncedRenderConsulta() {
   clearTimeout(_consultaDebounceTimer);
   _consultaDebounceTimer = setTimeout(renderConsulta, 200);
 }
+// ── Filtros multi-seleção (Consulta) ───────────────────────────────────────
+const MS_FILTERS = [
+  { key: 'mes',        id: 'msMes',    placeholder: 'Mês' },
+  { key: 'status',     id: 'msStatus', placeholder: 'Status' },
+  { key: 'sistConser', id: 'msSc',     placeholder: 'Sist. Conser.' },
+  { key: 'arquivos',   id: 'msArq',    placeholder: 'Arquivos' },
+];
+const CONSULTA_STATUS_OPTIONS = [
+  ['AG. MAP.',  'Aguard. Mapeamento'],
+  ['PENDENTE',  'Pendente'],
+  ['ANDAMENTO', 'Andamento'],
+  ['AG. MAPA',  'Ag. Mapa'],
+  ['OK',        'Concluído'],
+];
+const CONSULTA_ARQ_OPTIONS = [
+  ['SIM', 'Com arquivos'],
+  ['NAO', 'Sem arquivos'],
+];
+const consultaFilterState = { mes: new Set(), status: new Set(), sistConser: new Set(), arquivos: new Set() };
+const consultaFilterOptions = { mes: [], status: CONSULTA_STATUS_OPTIONS, sistConser: [], arquivos: CONSULTA_ARQ_OPTIONS };
+
+function renderMsPanels() {
+  MS_FILTERS.forEach(({ key, id, placeholder }) => {
+    const options = consultaFilterOptions[key] || [];
+    const sel = consultaFilterState[key];
+    const panel = document.getElementById(id + 'Panel');
+    if (panel) {
+      panel.innerHTML = options.length
+        ? options.map(([value, label]) => `
+            <label class="ms-filter-opt">
+              <input type="checkbox" ${sel.has(value) ? 'checked' : ''} onchange="toggleMsOption('${key}','${escAttrJs(value)}')">
+              <span>${escapeHtml(label)}</span>
+            </label>`).join('') +
+          `<div class="ms-filter-foot"><button type="button" onclick="clearMsFilter('${key}')">Limpar</button></div>`
+        : '<div class="ms-filter-empty">Nenhuma opção</div>';
+    }
+    const labelEl = document.getElementById(id + 'Label');
+    const btnEl   = document.getElementById(id + 'Btn');
+    if (labelEl) {
+      if (!sel.size) labelEl.textContent = placeholder;
+      else if (sel.size === 1) {
+        const opt = options.find(o => o[0] === [...sel][0]);
+        labelEl.textContent = opt ? opt[1] : placeholder;
+      } else {
+        labelEl.textContent = `${placeholder} (${sel.size})`;
+      }
+    }
+    if (btnEl) btnEl.classList.toggle('active', !!sel.size);
+  });
+}
+
+function toggleMsPanel(id) {
+  const panel = document.getElementById(id + 'Panel');
+  const isOpen = panel.classList.contains('open');
+  document.querySelectorAll('.ms-filter-panel.open').forEach(p => p.classList.remove('open'));
+  if (!isOpen) panel.classList.add('open');
+}
+
+function toggleMsOption(key, value) {
+  const sel = consultaFilterState[key];
+  if (sel.has(value)) sel.delete(value); else sel.add(value);
+  renderMsPanels();
+  renderConsulta();
+}
+
+function clearMsFilter(key) {
+  consultaFilterState[key].clear();
+  renderMsPanels();
+  renderConsulta();
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.ms-filter'))
+    document.querySelectorAll('.ms-filter-panel.open').forEach(p => p.classList.remove('open'));
+});
+
 function populateConsultaFilters() {
   const meses = new Set(), sistConsers = new Set();
   FAZENDA_NAMES.forEach(n => {
@@ -3622,29 +3735,19 @@ function populateConsultaFilters() {
       sistConsers.add(t.sistConser || 'SEM_DADO');
     });
   });
-  const selMes = document.getElementById('cFiltroMes');
-  const curMes = selMes.value;
-  selMes.innerHTML = '<option value="">— todos os meses —</option>' +
-    [...meses].sort().map(ym => {
-      const [y, m] = ym.split('-');
-      const nome = new Date(+y, +m - 1).toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
-      return `<option value="${ym}">${nome.charAt(0).toUpperCase() + nome.slice(1)}</option>`;
-    }).join('');
-  selMes.value = curMes;
-
-  const selSc = document.getElementById('cFiltroSistConser');
-  const curSc = selSc.value;
-  selSc.innerHTML = '<option value="">— todos os Sist. Conser. —</option>' +
-    [...sistConsers].sort().map(sc => `<option value="${escapeHtml(sc)}">${escapeHtml(sc === 'SEM_DADO' ? 'Sem dado' : sc)}</option>`).join('');
-  selSc.value = curSc;
+  consultaFilterOptions.mes = [...meses].sort().map(ym => {
+    const [y, m] = ym.split('-');
+    const nome = new Date(+y, +m - 1).toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+    return [ym, nome.charAt(0).toUpperCase() + nome.slice(1)];
+  });
+  consultaFilterOptions.sistConser = [...sistConsers].sort().map(sc => [sc, sc === 'SEM_DADO' ? 'Sem dado' : sc]);
+  renderMsPanels();
 }
 
 function limparFiltrosConsulta() {
-  document.getElementById('consultaSearch').value    = '';
-  document.getElementById('cFiltroMes').value        = '';
-  document.getElementById('cFiltroStatus').value     = '';
-  document.getElementById('cFiltroSistConser').value = '';
-  document.getElementById('cFiltroArquivos').value   = '';
+  document.getElementById('consultaSearch').value = '';
+  Object.values(consultaFilterState).forEach(s => s.clear());
+  renderMsPanels();
   renderConsulta();
 }
 
@@ -3722,16 +3825,12 @@ function renderConsulta(page) {
   if (_releaseTags === null) fetchReleaseTags();
 
   const q           = (document.getElementById('consultaSearch')?.value || '').toLowerCase();
-  const filtMes     = document.getElementById('cFiltroMes')?.value      || '';
-  const filtStatus  = document.getElementById('cFiltroStatus')?.value   || '';
-  const filtSc      = document.getElementById('cFiltroSistConser')?.value || '';
-  const filtArq     = document.getElementById('cFiltroArquivos')?.value  || '';
-  const matchSc = t => !filtSc || (t.sistConser || 'SEM_DADO') === filtSc;
-
-  document.getElementById('cFiltroMes').classList.toggle('active', !!filtMes);
-  document.getElementById('cFiltroStatus').classList.toggle('active', !!filtStatus);
-  document.getElementById('cFiltroSistConser').classList.toggle('active', !!filtSc);
-  document.getElementById('cFiltroArquivos')?.classList.toggle('active', !!filtArq);
+  const filtMes     = consultaFilterState.mes;
+  const filtStatus  = consultaFilterState.status;
+  const filtSc      = consultaFilterState.sistConser;
+  const filtArq     = consultaFilterState.arquivos;
+  const matchMes = t => !filtMes.size || filtMes.has(talYM(t));
+  const matchSc  = t => !filtSc.size  || filtSc.has(t.sistConser || 'SEM_DADO');
 
   const tagsReady = _releaseTags instanceof Set;
   const temArquivos = name => tagsReady && _releaseTags.has(String(FAZENDAS[name]?.cod ?? ''));
@@ -3740,12 +3839,12 @@ function renderConsulta(page) {
     ? FAZENDA_NAMES.filter(n => n.toLowerCase().includes(q) || String(FAZENDAS[n].cod).includes(q))
     : FAZENDA_NAMES;
 
-  if (filtMes || filtSc) names = names.filter(n =>
-    Object.values(FAZENDAS[n].talhoes).some(t =>
-      (!filtMes || talYM(t) === filtMes) && matchSc(t)));
-  if (filtStatus) names = names.filter(n => getFazStatus(n).status === filtStatus);
-  if (filtArq === 'SIM') names = names.filter(n => temArquivos(n));
-  if (filtArq === 'NAO') names = names.filter(n => !temArquivos(n));
+  if (filtMes.size || filtSc.size) names = names.filter(n =>
+    Object.values(FAZENDAS[n].talhoes).some(t => matchMes(t) && matchSc(t)));
+  if (filtStatus.size) names = names.filter(n => filtStatus.has(getFazStatus(n).status));
+  if (filtArq.size === 1) {
+    names = filtArq.has('SIM') ? names.filter(n => temArquivos(n)) : names.filter(n => !temArquivos(n));
+  }
 
   _consultaNames = names;
   const total = names.length;
@@ -3772,7 +3871,7 @@ function renderConsulta(page) {
   const rows = pageNames.map(name => {
     const d = FAZENDAS[name];
     const allTals = Object.values(d.talhoes);
-    const tals = allTals.filter(t => (!filtMes || talYM(t) === filtMes) && matchSc(t));
+    const tals = allTals.filter(t => matchMes(t) && matchSc(t));
     const totalTals = tals.length;
     const conc  = tals.filter(isTalDone).length;
     const { status, cls, ciclo } = getFazStatus(name);
@@ -3781,7 +3880,7 @@ function renderConsulta(page) {
     const cbTd = _consultaSelectMode
       ? `<td class="consulta-cb" onclick="event.stopPropagation()"><input type="checkbox" ${_consultaSelected.has(name) ? 'checked' : ''} onclick="toggleConsultaSel('${escName}',this)"></td>`
       : '';
-    return `<tr class="consulta-faz-row${_consultaSelected.has(name) ? ' selected' : ''}" onclick="toggleFazDetail('${escName}',this,'${filtMes}','${filtSc}')" oncontextmenu="openCtxMenu(event,'${escName}')" id="cfr-${CSS.escape(name)}">
+    return `<tr class="consulta-faz-row${_consultaSelected.has(name) ? ' selected' : ''}" onclick="toggleFazDetail('${escName}',this)" oncontextmenu="openCtxMenu(event,'${escName}')" id="cfr-${CSS.escape(name)}">
       ${cbTd}
       <td><span class="consulta-expand-icon" id="cfi-${CSS.escape(name)}">▶</span><strong>${escapeHtml(name)}</strong>${FAZENDAS[name]?.experimento ? ' <span class="faz-tag faz-tag-red" style="font-size:10px;margin-left:6px">EXPERIMENTO</span>' : ''}</td>
       <td style="font-family:monospace">${d.cod}</td>
@@ -3818,7 +3917,7 @@ function renderConsulta(page) {
   </div>`;
 }
 
-function toggleFazDetail(name, rowEl, filtMesArg, filtScArg) {
+function toggleFazDetail(name, rowEl) {
   const esc = CSS.escape(name);
   const detailRow = document.getElementById('cdr-' + esc);
   const inner     = document.getElementById('cdinner-' + esc);
@@ -3840,10 +3939,11 @@ function toggleFazDetail(name, rowEl, filtMesArg, filtScArg) {
   icon.textContent = '▼';
 
   const allTals = FAZENDAS[name].talhoes;
+  const filtMes = consultaFilterState.mes, filtSc = consultaFilterState.sistConser;
   const sorted = Object.keys(allTals).sort((a, b) => +a - +b).filter(t => {
     const td = allTals[t];
-    return (!filtMesArg || talYM(td) === filtMesArg) &&
-           (!filtScArg  || (td.sistConser || 'SEM_DADO') === filtScArg);
+    return (!filtMes.size || filtMes.has(talYM(td))) &&
+           (!filtSc.size  || filtSc.has(td.sistConser || 'SEM_DADO'));
   });
   const talRows = sorted.map(t => {
     const td = allTals[t];
